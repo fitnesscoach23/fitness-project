@@ -1,0 +1,166 @@
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: fitness-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    environment:
+      WORKOUT_SERVICE_URL: http://workout-service:8083
+      CHECKIN_SERVICE_URL: http://checkin-service:8085
+      DIET_REVIEW_SERVICE_URL: http://diet-review:8088
+    depends_on:
+      - auth-service
+      - member-service
+      - diet-service
+      - diet-review
+      - workout-service
+      - billing-service
+      - checkin-service
+      - notification-service
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/coach_auth
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      DB_MAX_POOL_SIZE: 3
+      DB_MIN_IDLE: 1
+
+  member-service:
+    build: ./member-service
+    container_name: member-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/coach_member
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      DB_MAX_POOL_SIZE: 3
+      DB_MIN_IDLE: 1
+
+  diet-service:
+    build: ./diet-service
+    container_name: diet-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/coach_diet
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      DB_MAX_POOL_SIZE: 3
+      DB_MIN_IDLE: 1
+
+  diet-review:
+    build: ./diet-review
+    container_name: diet-review
+    ports:
+      - "8088:8088"
+    environment:
+      SERVER_PORT: 8088
+      JWT_SECRET: ${JWT_SECRET:-YOhVIILWnA9ZCbUShsWIzqlVpDhpKEaYGAAjnplCmU4=}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_REVIEW_MODEL: ${OPENAI_REVIEW_MODEL:-gpt-4o-mini}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+
+  workout-service:
+    build: ./workout-service
+    container_name: workout-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/coach_workout
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      DB_MAX_POOL_SIZE: 3
+      DB_MIN_IDLE: 1
+
+  billing-service:
+    build: ./billing-service
+    container_name: billing-service
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/coach_billing
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      DB_MAX_POOL_SIZE: 3
+      DB_MIN_IDLE: 1
+
+  checkin-service:
+    build: ./checkin-service
+    container_name: checkin-service
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./checkin-service/checkin-photos:/app/checkin-photos
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/coach_checkin
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin
+      DB_MAX_POOL_SIZE: 3
+      DB_MIN_IDLE: 1
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-filesystem}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_KEY_PREFIX: ${S3_KEY_PREFIX:-checkin-photos/}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/coach_notification
+      DB_USERNAME: postgres
+      DB_PASSWORD: admin
+      DB_MAX_POOL_SIZE: 3
+      DB_MIN_IDLE: 1
+
+volumes:
+  postgres_data:

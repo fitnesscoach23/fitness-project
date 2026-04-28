@@ -1,0 +1,23 @@
+server:
+  port: ${SERVER_PORT:8088}
+
+spring:
+  application:
+    name: diet-review
+
+jwt:
+  secret: ${JWT_SECRET:YOhVIILWnA9ZCbUShsWIzqlVpDhpKEaYGAAjnplCmU4=}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+
+openai:
+  review:
+    enabled: ${OPENAI_REVIEW_ENABLED:true}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_REVIEW_MODEL:gpt-4o-mini}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    temperature: ${OPENAI_REVIEW_TEMPERATURE:0.3}
+    max-output-tokens: ${OPENAI_REVIEW_MAX_OUTPUT_TOKENS:700}
+    timeout-ms: ${OPENAI_REVIEW_TIMEOUT_MS:15000}
+    system-prompt: ${OPENAI_REVIEW_SYSTEM_PROMPT:You are a careful fitness nutrition reviewer. Return concise, practical coaching guidance. Do not prescribe medication or claim a diagnosis. Prefer suggestions that help a coach adjust meal composition, portioning, and meal balance.}
