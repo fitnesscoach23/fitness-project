@@ -1,0 +1,8 @@
+{$APP_DOMAIN} {
+  encode gzip zstd
+
+  @api path /auth/* /members/* /diet/* /diet-library/* /diet/review /workouts/* /exercise-library/* /billing/* /checkins/* /checkin/* /progress/* /daily-checkins/* /notifications/*
+  reverse_proxy @api gateway-service:8080
+
+  reverse_proxy fitness-coach-ui:80
+}

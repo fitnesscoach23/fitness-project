@@ -1,0 +1,234 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: fitness-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - fitness-coach-ui
+      - gateway-service
+
+  fitness-coach-ui:
+    build:
+      context: ./fitness-coach-ui
+      dockerfile: Dockerfile
+    container_name: fitness-coach-ui
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: fitness-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway-service
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - member-service
+      - diet-service
+      - diet-review
+      - workout-service
+      - billing-service
+      - checkin-service
+      - notification-service
+    environment:
+      SERVER_PORT: 8080
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      MEMBER_SERVICE_URL: http://member-service:8082
+      WORKOUT_SERVICE_URL: http://workout-service:8083
+      DIET_SERVICE_URL: http://diet-service:8084
+      CHECKIN_SERVICE_URL: http://checkin-service:8085
+      BILLING_SERVICE_URL: http://billing-service:8086
+      NOTIFICATION_SERVICE_URL: http://notification-service:8087
+      DIET_REVIEW_SERVICE_URL: http://diet-review:8088
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8081
+      DB_URL: jdbc:postgresql://postgres:5432/coach_auth
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-3}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-1}
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-10}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+  member-service:
+    build: ./member-service
+    container_name: member-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8082
+      DB_URL: jdbc:postgresql://postgres:5432/coach_member
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-3}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-1}
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-10}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+  workout-service:
+    build: ./workout-service
+    container_name: workout-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8083
+      DB_URL: jdbc:postgresql://postgres:5432/coach_workout
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-3}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-1}
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-10}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+  diet-service:
+    build: ./diet-service
+    container_name: diet-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8084
+      DB_URL: jdbc:postgresql://postgres:5432/coach_diet
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-3}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-1}
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-10}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+  checkin-service:
+    build: ./checkin-service
+    container_name: checkin-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8085
+      DB_URL: jdbc:postgresql://postgres:5432/coach_checkin
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-filesystem}
+      PHOTOS_DIR: /app/checkin-photos
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_KEY_PREFIX: ${S3_KEY_PREFIX:-checkin-photos/}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-3}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-1}
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-10}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+    volumes:
+      - checkin_photos:/app/checkin-photos
+
+  billing-service:
+    build: ./billing-service
+    container_name: billing-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8086
+      DB_URL: jdbc:postgresql://postgres:5432/coach_billing
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-3}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-1}
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-10}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8087
+      DB_URL: jdbc:postgresql://postgres:5432/coach_notification
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-3}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-1}
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-10}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+  diet-review:
+    build: ./diet-review
+    container_name: diet-review
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8088
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_REVIEW_MODEL: ${OPENAI_REVIEW_MODEL:-gpt-4o-mini}
+      OPENAI_REVIEW_ENABLED: ${OPENAI_REVIEW_ENABLED:-true}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_REVIEW_TEMPERATURE: ${OPENAI_REVIEW_TEMPERATURE:-0.3}
+      OPENAI_REVIEW_MAX_OUTPUT_TOKENS: ${OPENAI_REVIEW_MAX_OUTPUT_TOKENS:-700}
+      OPENAI_REVIEW_TIMEOUT_MS: ${OPENAI_REVIEW_TIMEOUT_MS:-15000}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  checkin_photos:
