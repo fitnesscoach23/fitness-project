@@ -1,0 +1,905 @@
+<div class="page-container">
+<!-- MEMBER HERO -->
+<div class="member-hero" *ngIf="member">
+
+  <div class="hero-left">
+    <h1 class="member-name">{{ member.fullName }}</h1>
+    <div class="member-email">{{ member.email }}</div>
+  </div>
+
+  <div class="hero-right">
+    <span
+      class="status-badge"
+      *ngIf="member?.status"
+      [class.inactive]="member.status === 'INACTIVE'">
+      {{ member.status }}
+    </span>
+
+    <button
+      [routerLink]="['/members', member.id, 'edit']"
+      class="primary-btn">
+      Edit
+    </button>
+
+    <button
+      class="danger-btn"
+      (click)="deleteMember()"
+      [disabled]="deletingMember">
+      {{ deletingMember ? 'Deleting...' : 'Delete' }}
+    </button>
+
+    <button
+      class="secondary-btn"
+      [routerLink]="['/notifications']"
+      [queryParams]="{
+        memberId: member.id,
+        channel: 'EMAIL',
+        type: 'WELCOME',
+        recipient: member.email,
+        subject: 'Welcome to your program',
+        message: 'Welcome to the program.'
+      }">
+      Send Welcome
+    </button>
+
+    <button routerLink="/members" class="secondary-btn">
+      Back
+    </button>
+  </div>
+
+</div>
+
+<!-- QUICK STATS -->
+<div class="quick-stats" *ngIf="member">
+
+  <div class="stat-item">
+    <div class="stat-label">Active Since</div>
+    <div class="stat-value">
+      {{ displayedActiveSince }}
+    </div>
+  </div>
+
+  <div class="stat-item">
+    <div class="stat-label">Current Plan</div>
+    <div class="stat-value">
+      {{ subscription?.planName || 'No Plan' }}
+    </div>
+  </div>
+
+  <div class="stat-item">
+    <div class="stat-label">Renewal Date</div>
+    <div class="stat-value">
+      {{ displayedRenewalDate }}
+    </div>
+  </div>
+
+  <div
+    class="stat-item"
+    [class.warning-stat]="memberExpiringSoon"
+    [class.danger-stat]="memberExpired">
+    <div class="stat-label">Days Remaining</div>
+    <div class="stat-value">
+      {{ renewalDaysRemainingLabel }}
+    </div>
+  </div>
+
+</div>
+
+<!-- SECTION TABS -->
+<div class="section-tabs">
+  <button
+    [class.active]="activeSection === 'overview'"
+    (click)="setSection('overview')">
+    Overview
+  </button>
+
+  <button
+    [class.active]="activeSection === 'bodyMetrics'"
+    (click)="setSection('bodyMetrics')">
+    Body Metrics
+  </button>
+
+  <button
+    [class.active]="activeSection === 'billing'"
+    (click)="setSection('billing')">
+    Billing
+  </button>
+
+  <button
+    [class.active]="activeSection === 'progress'"
+    (click)="setSection('progress')">
+    Progress
+  </button>
+
+  <button
+    [class.active]="activeSection === 'dailyConsistency'"
+    (click)="setSection('dailyConsistency')">
+    Daily Consistency
+  </button>
+
+  <button
+    [class.active]="activeSection === 'workout'"
+    (click)="setSection('workout')">
+    Workout
+  </button>
+
+  <button
+    [class.active]="activeSection === 'diet'"
+    (click)="setSection('diet')">
+    Diet
+  </button>
+</div>
+
+<!-- LOADING -->
+<div *ngIf="loading" class="state">
+  Loading member...
+</div>
+
+<div *ngIf="error && !loading" class="state error">
+  {{ error }}
+</div>
+
+<div *ngIf="member && !loading">
+
+  <!-- ================= OVERVIEW ================= -->
+<div *ngIf="activeSection === 'overview'" class="overview-grid">
+
+  <div class="card overview-headline">
+    <h3 class="card-title">Member Snapshot</h3>
+
+    <div class="info-grid compact">
+      <div class="info-item">
+        <label>Phone</label>
+        <span>{{ formatMemberValue(member.phone) }}</span>
+      </div>
+      <div class="info-item">
+        <label>Gender</label>
+        <span>{{ formatMemberValue(member.gender) }}</span>
+      </div>
+      <div class="info-item">
+        <label>Main Goal</label>
+        <span>{{ formatMemberValue(member.mainTrainingGoal || member.goal) }}</span>
+      </div>
+      <div class="info-item">
+        <label>Current Weight</label>
+        <span>{{ formatMemberValue(member.currentWeightKg) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUBSCRIPTION CARD -->
+  <div class="card overview-section-card">
+
+    <h3 class="card-title">Subscription</h3>
+
+    <div *ngIf="subscriptionLoading">
+      Loading subscription...
+    </div>
+
+    <div *ngIf="subscription && !subscriptionLoading" class="info-grid">
+
+      <div>
+        <label>Status</label>
+        <span
+          class="status-badge"
+          [ngClass]="{
+            'active': subscription.status === 'ACTIVE'
+          }">
+          {{ subscription.status }}
+        </span>
+      </div>
+
+      <div>
+        <label>Plan</label>
+        <span>{{ subscription.planName || 'No Plan' }}</span>
+      </div>
+
+      <div>
+        <label>Start</label>
+        <span>{{ displayedActiveSince }}</span>
+      </div>
+
+      <div>
+        <label>End</label>
+        <span>{{ displayedRenewalDate }}</span>
+      </div>
+
+    </div>
+
+    <div *ngIf="!subscription && !subscriptionLoading">
+      No active subscription
+    </div>
+
+  </div>
+
+  <div class="card overview-section-card" *ngFor="let section of overviewSections">
+    <h3 class="card-title">{{ section.title }}</h3>
+
+    <div class="info-grid compact">
+      <div class="info-item" *ngFor="let item of section.items">
+        <label>{{ item.label }}</label>
+
+        <a
+          *ngIf="item.asLink && isExternalLink(getMemberValue(item.key))"
+          [href]="getMemberValue(item.key)"
+          target="_blank"
+          rel="noopener noreferrer">
+          {{ getMemberValue(item.key) }}
+        </a>
+
+        <span
+          *ngIf="!(item.asLink && isExternalLink(getMemberValue(item.key)))"
+          [class.muted-value]="!hasMemberValue(item.key)">
+          {{ formatMemberValue(getMemberValue(item.key)) }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+  <!-- ================= BODY METRICS ================= -->
+  <div *ngIf="activeSection === 'bodyMetrics'" class="body-metrics-grid">
+    <div class="card">
+      <div class="card-title">Inputs</div>
+
+      <div class="metrics-grid">
+        <div class="metrics-field">
+          <label>Height (cm)</label>
+          <input type="number" [(ngModel)]="bodyMetrics.heightCm" (ngModelChange)="onBodyMetricInput('heightCm')" />
+        </div>
+        <div class="metrics-field">
+          <label>Current Weight (kg)</label>
+          <input type="number" [(ngModel)]="bodyMetrics.currentWeightKg" (ngModelChange)="onBodyMetricInput('currentWeightKg')" />
+        </div>
+        <div class="metrics-field">
+          <label>Gender</label>
+          <select [(ngModel)]="bodyMetrics.gender" (ngModelChange)="onBodyMetricInput('gender')">
+            <option value="">Select</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="metrics-field">
+          <label>Age</label>
+          <input type="number" [(ngModel)]="bodyMetrics.age" (ngModelChange)="onBodyMetricInput('age')" />
+        </div>
+      </div>
+
+      <label class="metrics-checkbox">
+          <input type="checkbox" [(ngModel)]="bodyMetrics.isLean" (change)="onBodyMetricInput('isLean')" />
+        Lean (keep IBW = current weight)
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Energy Calculations</div>
+
+      <div class="metrics-grid">
+        <div class="metrics-field">
+          <label>Activity Factor</label>
+          <select [(ngModel)]="bodyMetrics.activityFactor" (ngModelChange)="onBodyMetricInput('activityFactor')">
+            <option *ngFor="let option of activityOptions" [ngValue]="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </div>
+        <div class="metrics-field">
+          <label>IBW (kg)</label>
+          <input type="number" [(ngModel)]="bodyMetrics.ibwKg" (ngModelChange)="onBodyMetricInput('ibwKg')" />
+        </div>
+        <div class="metrics-field">
+          <label>BMI</label>
+          <input type="number" [(ngModel)]="bodyMetrics.bmi" (ngModelChange)="onBodyMetricInput('bmi')" />
+        </div>
+        <div class="metrics-field">
+          <label>BMR</label>
+          <input type="number" [(ngModel)]="bodyMetrics.bmr" (ngModelChange)="onBodyMetricInput('bmr')" />
+        </div>
+        <div class="metrics-field">
+          <label>TDEE</label>
+          <input type="number" [(ngModel)]="bodyMetrics.tdee" (ngModelChange)="onBodyMetricInput('tdee')" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Target Calories</div>
+
+      <div class="metrics-grid">
+        <div class="metrics-field">
+          <label>Goal</label>
+          <select [(ngModel)]="bodyMetrics.targetGoal" (ngModelChange)="onGoalChange()">
+            <option *ngFor="let goal of targetGoalOptions" [ngValue]="goal.value">
+              {{ goal.label }}
+            </option>
+          </select>
+        </div>
+        <div class="metrics-field">
+          <label>Calorie Factor (per lb IBW)</label>
+          <input
+            type="number"
+            [(ngModel)]="bodyMetrics.targetCalorieFactor"
+            (ngModelChange)="onBodyMetricInput('targetCalorieFactor')"
+            [disabled]="bodyMetricsManualOverride" />
+        </div>
+        <div class="metrics-field">
+          <label>Target Calories</label>
+          <input type="number" [(ngModel)]="bodyMetrics.targetCalories" (ngModelChange)="onBodyMetricInput('targetCalories')" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Macro Targets</div>
+
+      <div class="metrics-grid">
+        <div class="metrics-field">
+          <label>Protein RDA (g/kg)</label>
+          <input
+            type="number"
+            step="0.1"
+            [(ngModel)]="bodyMetrics.proteinRda"
+            (ngModelChange)="onTrainingHistoryChange()"
+            [disabled]="bodyMetricsManualOverride" />
+        </div>
+        <div class="metrics-field">
+          <label>Carb Factor (g/kg IBW)</label>
+          <input
+            type="number"
+            step="0.1"
+            [(ngModel)]="bodyMetrics.carbFactor"
+            (ngModelChange)="onBodyMetricInput('carbFactor')"
+            [disabled]="bodyMetricsManualOverride" />
+        </div>
+        <div class="metrics-field">
+          <label>Protein (g)</label>
+          <input type="number" [(ngModel)]="bodyMetrics.proteinGrams" (ngModelChange)="onBodyMetricInput('proteinGrams')" />
+        </div>
+        <div class="metrics-field">
+          <label>Carbs (g)</label>
+          <input type="number" [(ngModel)]="bodyMetrics.carbsGrams" (ngModelChange)="onBodyMetricInput('carbsGrams')" />
+        </div>
+        <div class="metrics-field">
+          <label>Fats (g)</label>
+          <input type="number" [(ngModel)]="bodyMetrics.fatsGrams" (ngModelChange)="onBodyMetricInput('fatsGrams')" />
+        </div>
+      </div>
+
+      <div class="metrics-reference">
+        <div class="metrics-reference-title">Training History Reference (Protein RDA)</div>
+        <div class="metrics-reference-grid">
+          <div class="metrics-reference-row">
+            <span> Sedentary </span>
+            <span>0.8-1.0 g/kg bw</span>
+          </div>
+          <div class="metrics-reference-row">
+            <span>Beginner/Females</span>
+            <span>1.0-1.3 g/kg bw</span>
+          </div>
+          <div class="metrics-reference-row">
+            <span>Intermediate</span>
+            <span>1.5-1.8 g/kg bw</span>
+          </div>
+          <div class="metrics-reference-row">
+            <span>Advance</span>
+            <span>1.6-2.0 g/kg bw</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="metrics-actions">
+        <label class="metrics-checkbox">
+          <input type="checkbox" [(ngModel)]="bodyMetricsAutoCalc" />
+          Auto-calculate
+        </label>
+        <button
+          type="button"
+          class="secondary-btn"
+          (click)="toggleBodyMetricsManualOverride()">
+          {{ bodyMetricsManualOverride ? 'Disable Manual Override' : 'Manual Override' }}
+        </button>
+        <div class="metrics-action-buttons">
+          <button type="button" class="secondary-btn" (click)="recalculateBodyMetrics('auto')">
+          Recalculate
+          </button>
+          <button
+            type="button"
+            class="primary-btn"
+            [disabled]="bodyMetricsSaving"
+            (click)="saveBodyMetrics()">
+            {{ bodyMetricsSaving ? 'Saving...' : 'Save' }}
+          </button>
+        </div>
+      </div>
+      <div *ngIf="bodyMetricsMessage" class="metrics-message">
+        {{ bodyMetricsMessage }}
+      </div>
+      <div *ngIf="bodyMetricsManualOverride" class="metrics-message">
+        Manual override is active. Target Calories, Protein, Carbs, and Fats will be saved exactly as entered.
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= BILLING ================= -->
+ <div *ngIf="activeSection === 'billing'" class="billing-layout">
+  <div class="billing-summary">
+    <div class="summary-card">
+      <div class="summary-label">Renewal Date</div>
+      <div class="summary-value">{{ displayedRenewalDate }}</div>
+    </div>
+
+    <div
+      class="summary-card"
+      [class.pending-card]="memberExpiringSoon"
+      [class.overdue-card]="memberExpired">
+      <div class="summary-label">Days Remaining</div>
+      <div class="summary-value">{{ renewalDaysRemainingLabel }}</div>
+    </div>
+
+    <div class="summary-card pending-card">
+      <div class="summary-label">Pending Due</div>
+      <div class="summary-value">₹ {{ totalPending }}</div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-label">Total Paid</div>
+      <div class="summary-value">₹ {{ totalPaid }}</div>
+    </div>
+  </div>
+
+  <div class="card billing-shortcut-card">
+    <h3 class="card-title">Need to manage billing?</h3>
+    <p>Use the central Billing console to create payments, confirm dues, and apply subscription overrides.</p>
+    <button class="primary-btn" routerLink="/billing">Open Billing Console</button>
+  </div>
+
+  <div class="card">
+
+    <h3 class="card-title">Payment History</h3>
+
+    <div *ngIf="paymentsLoading">Loading payments...</div>
+
+    <table *ngIf="payments.length > 0" class="data-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Method</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let p of payments; trackBy: trackByPaymentId">
+          <td>{{ p.paymentDate }}</td>
+          <td>₹ {{ p.amount }}</td>
+          <td>
+            <span
+              class="payment-badge"
+              [ngClass]="{
+                'success': p.status === 'SUCCESS',
+                'pending': p.status === 'PENDING'
+              }">
+              {{ p.status }}
+            </span>
+          </td>
+          <td>{{ p.mode }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!paymentsLoading && payments.length === 0">
+      No payment history found
+    </div>
+
+  </div>
+</div>
+  <!-- ================= PROGRESS ================= -->
+   <div class="progress-summary" *ngIf="activeSection === 'progress' && progressCheckins.length">
+
+  <div class="summary-card">
+    <div class="summary-label">Latest Weight</div>
+    <div class="summary-value">{{ latestWeight }} kg</div>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-label">Weight Change</div>
+    <div
+      class="summary-value"
+      [ngClass]="{
+        'positive': weightChange < 0,
+        'negative': weightChange > 0
+      }">
+      {{ weightChange > 0 ? '+' : '' }}{{ weightChange | number:'1.2-2' }} kg
+    </div>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-label">Avg Diet</div>
+    <div class="summary-value">
+      {{ avgDietAdherence | number:'1.0-1' }}/10
+    </div>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-label">Avg Steps</div>
+    <div class="summary-value">
+      {{ avgSteps | number:'1.0-0' }}
+    </div>
+  </div>
+
+</div>
+  <div *ngIf="activeSection === 'progress'" class="card">
+
+    <div class="progress-section-header">
+      <h3 class="section-title">Progress Check-ins</h3>
+      <button
+        type="button"
+        class="secondary-btn"
+        (click)="openProgressComparison()"
+        [disabled]="!canCompareProgress">
+        Compare Latest 2 Check-ins
+      </button>
+    </div>
+
+    <div class="progress-content">
+      <div class="progress-list">
+        <div *ngIf="progressCheckinsLoading">Loading...</div>
+
+        <div *ngFor="let c of progressCheckins" class="checkin-card">
+
+          <div class="checkin-header">
+            <div class="checkin-date">
+              {{ formatProgressCheckinDate(c.submittedAt) }}
+            </div>
+          </div>
+
+          <div class="checkin-grid">
+            <div *ngIf="c.weight"><b>Weight</b><span>{{ c.weight }} kg</span></div>
+            <div *ngIf="c.dietAdherence"><b>Diet</b><span>{{ c.dietAdherence }}/10</span></div>
+            <div *ngIf="c.exerciseRating != null || c.energy != null"><b>Exercise Rating</b><span>{{ c.exerciseRating ?? c.energy }}/10</span></div>
+            <div *ngIf="c.energy"><b>Energy</b><span>{{ c.energy }}/10</span></div>
+            <div *ngIf="c.stepsAvg"><b>Steps</b><span>{{ c.stepsAvg }}</span></div>
+          </div>
+
+          <div *ngIf="c.notes" class="checkin-notes">
+            {{ c.notes }}
+          </div>
+
+          <div *ngIf="checkinPhotos[c.id]?.length" class="photo-row">
+            <div
+              *ngFor="let p of checkinPhotos[c.id]; let i = index"
+              class="progress-photo-item"
+              draggable="true"
+              (dragstart)="onPhotoDragStart(c.id, i)"
+              (dragover)="onPhotoDragOver($event)"
+              (drop)="onPhotoDrop(c.id, i)"
+              (dragend)="onPhotoDragEnd()">
+              <img
+                [src]="getCheckinPhotoUrl(p.fileName)"
+                class="progress-photo"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="!progressCheckinsLoading && progressCheckins.length === 0">
+          No progress check-ins found.
+        </div>
+      </div>
+
+      <div class="card weight-card">
+        <h3 class="card-title">Weight Progress</h3>
+        <div class="chart-wrapper">
+          <canvas id="weightChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div
+    class="comparison-modal-backdrop"
+    *ngIf="showProgressComparisonModal"
+    (click)="closeProgressComparison()">
+    <div
+      #comparisonModal
+      class="comparison-modal"
+      [class.maximized]="isProgressComparisonMaximized"
+      (click)="$event.stopPropagation()">
+      <div class="comparison-modal-header">
+        <div>
+          <h3>Progress Comparison</h3>
+          <p>
+            {{ member?.fullName }} · {{ formatProgressCheckinDate(currentCheckin?.submittedAt) }}
+            vs {{ formatProgressCheckinDate(previousCheckin?.submittedAt) }}
+          </p>
+        </div>
+        <div class="comparison-modal-actions">
+          <div class="comparison-zoom-controls">
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="zoomOutComparison()">
+              Zoom Out
+            </button>
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="resetComparisonZoom()">
+              {{ (comparisonZoomLevel * 100) | number:'1.0-0' }}%
+            </button>
+            <button
+              type="button"
+              class="secondary-btn"
+              (click)="zoomInComparison()">
+              Zoom In
+            </button>
+          </div>
+          <button
+            type="button"
+            class="secondary-btn"
+            (click)="toggleProgressComparisonMaximize()">
+            {{ isProgressComparisonMaximized ? 'Restore' : 'Maximize' }}
+          </button>
+          <button type="button" class="secondary-btn" (click)="closeProgressComparison()">Close</button>
+        </div>
+      </div>
+
+      <div
+        class="comparison-zoom-shell"
+        [style.transform]="'scale(' + comparisonZoomLevel + ')'"
+        [style.transformOrigin]="'top center'">
+        <div class="comparison-grid">
+          <div class="comparison-summary-card">
+            <div class="comparison-summary-title">Member Summary</div>
+
+            <div class="comparison-summary-table">
+              <div class="comparison-label">Member Name</div>
+              <div class="comparison-value strong">{{ member?.fullName || 'NA' }}</div>
+
+              <div class="comparison-label">Current Weight</div>
+              <div class="comparison-value">{{ getComparisonValue(currentCheckin, 'weight') }}</div>
+
+              <div class="comparison-label">Previous Weight</div>
+              <div class="comparison-value">{{ getComparisonValue(previousCheckin, 'weight') }}</div>
+
+              <div class="comparison-label">Current Steps</div>
+              <div class="comparison-value">{{ getComparisonValue(currentCheckin, 'stepsAvg') }}</div>
+
+              <div class="comparison-label">Previous Steps</div>
+              <div class="comparison-value">{{ getComparisonValue(previousCheckin, 'stepsAvg') }}</div>
+
+              <div class="comparison-label accent">Current Diet Plan</div>
+              <div class="comparison-value wide">{{ currentDietPlanSummary }}</div>
+
+              <div class="comparison-label accent">Last Changes</div>
+              <div class="comparison-value wide">
+                Weight {{ getComparisonDelta('weight') }} · Steps {{ getComparisonDelta('stepsAvg') }}
+              </div>
+
+              <div class="comparison-label accent">Exercise Rating</div>
+              <div class="comparison-value wide">
+                Current {{ getComparisonValue(currentCheckin, 'exerciseRating') }}/10
+                <br />
+                Previous {{ getComparisonValue(previousCheckin, 'exerciseRating') }}/10
+              </div>
+
+              <div class="comparison-label accent">Coach Notes</div>
+              <div class="comparison-value wide comparison-notes-value">
+                <strong>Most Recent:</strong> {{ getComparisonNotes(currentCheckin) }}
+                <br />
+                <strong>Previous:</strong> {{ getComparisonNotes(previousCheckin) }}
+              </div>
+            </div>
+          </div>
+
+          <div class="comparison-photo-column">
+            <div class="comparison-photo-title">Front Pose</div>
+            <div class="comparison-photo-card">
+              <img
+                *ngIf="getPhotoByType(currentCheckin?.id, 'FRONT') as currentFront; else noCurrentFront"
+                [src]="getCheckinPhotoUrl(currentFront)"
+                class="comparison-photo"
+              />
+              <ng-template #noCurrentFront>
+                <div class="comparison-photo-empty">No current front photo</div>
+              </ng-template>
+              <div class="comparison-photo-caption">Most Recent</div>
+            </div>
+            <div class="comparison-photo-card">
+              <img
+                *ngIf="getPhotoByType(previousCheckin?.id, 'FRONT') as previousFront; else noPreviousFront"
+                [src]="getCheckinPhotoUrl(previousFront)"
+                class="comparison-photo"
+              />
+              <ng-template #noPreviousFront>
+                <div class="comparison-photo-empty">No previous front photo</div>
+              </ng-template>
+              <div class="comparison-photo-caption">Previous</div>
+            </div>
+          </div>
+
+          <div class="comparison-photo-column">
+            <div class="comparison-photo-title">Side Pose</div>
+            <div class="comparison-photo-card">
+              <img
+                *ngIf="getPhotoByType(currentCheckin?.id, 'SIDE') as currentSide; else noCurrentSide"
+                [src]="getCheckinPhotoUrl(currentSide)"
+                class="comparison-photo"
+              />
+              <ng-template #noCurrentSide>
+                <div class="comparison-photo-empty">No current side photo</div>
+              </ng-template>
+              <div class="comparison-photo-caption">Most Recent</div>
+            </div>
+            <div class="comparison-photo-card">
+              <img
+                *ngIf="getPhotoByType(previousCheckin?.id, 'SIDE') as previousSide; else noPreviousSide"
+                [src]="getCheckinPhotoUrl(previousSide)"
+                class="comparison-photo"
+              />
+              <ng-template #noPreviousSide>
+                <div class="comparison-photo-empty">No previous side photo</div>
+              </ng-template>
+              <div class="comparison-photo-caption">Previous</div>
+            </div>
+          </div>
+
+          <div class="comparison-photo-column">
+            <div class="comparison-photo-title">Back Pose</div>
+            <div class="comparison-photo-card">
+              <img
+                *ngIf="getPhotoByType(currentCheckin?.id, 'BACK') as currentBack; else noCurrentBack"
+                [src]="getCheckinPhotoUrl(currentBack)"
+                class="comparison-photo"
+              />
+              <ng-template #noCurrentBack>
+                <div class="comparison-photo-empty">No current back photo</div>
+              </ng-template>
+              <div class="comparison-photo-caption">Most Recent</div>
+            </div>
+            <div class="comparison-photo-card">
+              <img
+                *ngIf="getPhotoByType(previousCheckin?.id, 'BACK') as previousBack; else noPreviousBack"
+                [src]="getCheckinPhotoUrl(previousBack)"
+                class="comparison-photo"
+              />
+              <ng-template #noPreviousBack>
+                <div class="comparison-photo-empty">No previous back photo</div>
+              </ng-template>
+              <div class="comparison-photo-caption">Previous</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DAILY CONSISTENCY ================= -->
+  <div *ngIf="activeSection === 'dailyConsistency'" class="card daily-consistency-card">
+    <app-daily-checkin-calendar [memberId]="member.id"></app-daily-checkin-calendar>
+  </div>
+
+ <!-- ================= WORKOUT ================= -->
+<div *ngIf="activeSection === 'workout'" class="card">
+
+  <div class="workout-toolbar">
+    <h3 class="card-title">Workout Plan</h3>
+    <button
+      class="secondary-btn"
+      (click)="exportWorkoutPlanToExcel()"
+      [disabled]="!activeWorkoutPlan">
+      Export to Excel
+    </button>
+  </div>
+
+  <!-- Active Plan -->
+<div *ngIf="activeWorkoutPlan" class="active-plan">
+  <h3 class="plan-title">{{ activeWorkoutPlan.title }}</h3>
+  <p class="plan-notes" *ngIf="activeWorkoutPlan.notes">
+    {{ activeWorkoutPlan.notes }}
+  </p>
+  <p class="plan-notes muted" *ngIf="!activeWorkoutPlan.notes">
+    No additional notes.
+  </p>
+
+  <div *ngFor="let day of activeWorkoutPlan.days" class="day-card">
+
+    <h4 class="day-title">{{ day.dayName }}</h4>
+
+    <!-- Header Row -->
+    <div class="workout-header">
+      <div>Exercise</div>
+      <div>Set</div>
+      <div>Reps</div>
+      <div>Video URL</div>
+    </div>
+
+    <!-- Exercise Rows -->
+    <div *ngFor="let ex of day.exercises">
+
+      <div *ngFor="let s of ex.sets" class="workout-row">
+        <div class="exercise-col">{{ ex.name }}</div>
+        <div>{{ s.setNumber }}</div>
+        <div>{{ s.reps }}</div>
+        <div>
+          <a
+            *ngIf="getWorkoutVideoUrl(ex) as videoUrl; else noWorkoutVideo"
+            [href]="videoUrl"
+            target="_blank"
+            rel="noopener noreferrer">
+            Open Video
+          </a>
+          <ng-template #noWorkoutVideo>-</ng-template>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+<!-- ================= DIET ================= -->
+<div *ngIf="activeSection === 'diet'" class="card">
+
+  <div class="diet-header">
+    <h3>Diet Plan</h3>
+    <button
+      class="secondary-btn"
+      (click)="exportDietPlanToExcel()"
+      [disabled]="!dietPlan">
+      Export to Excel
+    </button>
+  </div>
+
+  <div *ngIf="dietPlan">
+
+    <h4 class="plan-title">{{ dietPlan.title }}</h4>
+
+    <div *ngFor="let meal of groupedDietMeals" class="meal-card">
+
+      <h5 class="meal-title">{{ meal.mealName }}</h5>
+
+      <!-- Column Header -->
+      <div class="diet-header-row">
+        <div>Food</div>
+        <div>Qty</div>
+        <div>Cal</div>
+        <div>P</div>
+        <div>C</div>
+        <div>F</div>
+      </div>
+
+      <!-- Food Rows -->
+      <div *ngFor="let i of meal.items" class="diet-row">
+        <div class="food-name">
+          <div>{{ getDietItemDisplayName(i.foodName) }}</div>
+          <div
+            *ngIf="getDietItemOptionalAlternatives(i.foodName).length"
+            class="diet-optional-text">
+            Optional: {{ getDietItemOptionalAlternatives(i.foodName).join(', ') }}
+          </div>
+        </div>
+        <div>{{ i.quantity }}</div>
+        <div>{{ i.calories }}</div>
+        <div>{{ i.protein }}</div>
+        <div>{{ i.carbs }}</div>
+        <div>{{ i.fat }}</div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div *ngIf="!dietPlan">
+    No diet plan assigned
+  </div>
+
+</div>
+</div>
+</div>

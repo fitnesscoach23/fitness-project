@@ -1,0 +1,8 @@
+CREATE TABLE checkin_photos (
+    id UUID PRIMARY KEY,
+    check_in_id UUID NOT NULL REFERENCES checkins(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    size BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
