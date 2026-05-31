@@ -6,13 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import software.amazon.awssdk.core.ResponseBytes;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -27,74 +22,34 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Service
 public class PhotoStorageService {
 
-    private final String provider;
-    private final String photosDir;
-    private final String bucket;
-    private final String keyPrefix;
-    private final S3Client s3Client;
+    private static final Logger log = LoggerFactory.getLogger(PhotoStorageService.class);
+
+    private final Path photosRoot;
 
     public PhotoStorageService(
-            @Value("${storage.provider:filesystem}") String provider,
-            @Value("${storage.photos-dir:./checkin-photos}") String photosDir,
-            @Value("${storage.s3.bucket:}") String bucket,
-            @Value("${storage.s3.region:ap-south-1}") String region,
-            @Value("${storage.s3.key-prefix:checkin-photos/}") String keyPrefix
+            @Value("${storage.photos-dir:D:/Checkin-Photos}") String photosDir
     ) {
-        this.provider = provider.toLowerCase(Locale.ROOT);
-        this.photosDir = photosDir;
-        this.bucket = bucket;
-        this.keyPrefix = normalizePrefix(keyPrefix);
-        this.s3Client = isS3()
-                ? S3Client.builder().region(Region.of(region)).build()
-                : null;
+        this.photosRoot = Paths.get(photosDir).toAbsolutePath().normalize();
     }
 
-    public SavedPhoto savePhoto(UUID photoId, MultipartFile file) throws IOException {
+    public SavedPhoto savePhoto(UUID photoId, String memberName, MultipartFile file) throws IOException {
         PreparedPhoto preparedPhoto = preparePhoto(file.getBytes(), file.getOriginalFilename(), file.getContentType());
         String storedFileName = photoId + "_" + preparedPhoto.fileName();
-        if (isS3()) {
-            String objectKey = keyPrefix + storedFileName;
-            PutObjectRequest request = PutObjectRequest.builder()
-                    .bucket(requiredBucket())
-                    .key(objectKey)
-                    .contentType(preparedPhoto.contentType())
-                    .build();
-            s3Client.putObject(request, RequestBody.fromBytes(preparedPhoto.bytes()));
-            return new SavedPhoto(storedFileName, preparedPhoto.contentType(), (long) preparedPhoto.bytes().length);
-        }
 
-        Path dirPath = Paths.get(photosDir);
-        if (!Files.exists(dirPath)) {
-            Files.createDirectories(dirPath);
-        }
+        String memberFolder = sanitizeFolderName(memberName);
+        Path dirPath = photosRoot.resolve(memberFolder).normalize();
+        ensureInsidePhotosRoot(dirPath);
+        Files.createDirectories(dirPath);
+
         Path filePath = dirPath.resolve(storedFileName);
         Files.write(filePath, preparedPhoto.bytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-        return new SavedPhoto(storedFileName, preparedPhoto.contentType(), (long) preparedPhoto.bytes().length);
+        return new SavedPhoto(memberFolder + "/" + storedFileName, preparedPhoto.contentType(), (long) preparedPhoto.bytes().length);
     }
 
     public StoredPhoto load(String fileName) throws IOException {
-        if (isS3()) {
-            ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
-                    GetObjectRequest.builder()
-                            .bucket(requiredBucket())
-                            .key(keyPrefix + fileName)
-                            .build()
-            );
-            String contentType = objectBytes.response().contentType();
-            if (isHeic(fileName, contentType)) {
-                return new StoredPhoto(
-                        new ByteArrayResource(convertHeicToJpeg(objectBytes.asByteArray())),
-                        "image/jpeg"
-                );
-            }
-            return new StoredPhoto(
-                    new ByteArrayResource(objectBytes.asByteArray()),
-                    contentType
-            );
-        }
-
-        Path path = Paths.get(photosDir).resolve(fileName);
+        Path path = photosRoot.resolve(fileName).normalize();
+        ensureInsidePhotosRoot(path);
         if (!Files.exists(path) || !Files.isReadable(path)) {
             throw new ResponseStatusException(NOT_FOUND, "Photo file not found: " + fileName);
         }
@@ -102,7 +57,12 @@ public class PhotoStorageService {
         String contentType = Files.probeContentType(path);
         byte[] bytes = Files.readAllBytes(path);
         if (isHeic(fileName, contentType)) {
-            return new StoredPhoto(new ByteArrayResource(convertHeicToJpeg(bytes)), "image/jpeg");
+            try {
+                return new StoredPhoto(new ByteArrayResource(convertHeicToJpeg(bytes)), "image/jpeg");
+            } catch (IOException e) {
+                log.warn("Serving original HEIC/HEIF photo because JPEG conversion failed for {}", fileName, e);
+                return new StoredPhoto(new ByteArrayResource(bytes), normalizeContentType(contentType));
+            }
         }
         return new StoredPhoto(new ByteArrayResource(bytes), contentType);
     }
@@ -116,20 +76,33 @@ public class PhotoStorageService {
     private record PreparedPhoto(byte[] bytes, String fileName, String contentType) {
     }
 
-    private boolean isS3() {
-        return "s3".equals(provider);
-    }
-
-    private String requiredBucket() {
-        if (bucket == null || bucket.isBlank()) {
-            throw new IllegalStateException("storage.s3.bucket must be configured when storage.provider=s3");
-        }
-        return bucket;
-    }
-
     private String sanitizeFileName(String originalFileName) {
         String value = Objects.requireNonNullElse(originalFileName, "upload.bin");
-        return value.replace("\\", "_").replace("/", "_");
+        return value.replace("\\", "_")
+                .replace("/", "_")
+                .replaceAll("[<>:\"|?*\\p{Cntrl}]", "_")
+                .trim();
+    }
+
+    private String sanitizeFolderName(String folderName) {
+        String value = Objects.requireNonNullElse(folderName, "Unknown Member").trim();
+        if (value.isBlank()) {
+            value = "Unknown Member";
+        }
+
+        String sanitized = value.replace("\\", "_")
+                .replace("/", "_")
+                .replaceAll("[<>:\"|?*\\p{Cntrl}]", "_")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        return sanitized.isBlank() ? "Unknown Member" : sanitized;
+    }
+
+    private void ensureInsidePhotosRoot(Path path) {
+        if (!path.normalize().startsWith(photosRoot)) {
+            throw new ResponseStatusException(NOT_FOUND, "Photo file not found");
+        }
     }
 
     private PreparedPhoto preparePhoto(byte[] bytes, String originalFileName, String contentType) throws IOException {
@@ -138,11 +111,16 @@ public class PhotoStorageService {
             return new PreparedPhoto(bytes, fileName, normalizeContentType(contentType));
         }
 
-        return new PreparedPhoto(
-                convertHeicToJpeg(bytes),
-                replaceExtension(fileName, ".jpg"),
-                "image/jpeg"
-        );
+        try {
+            return new PreparedPhoto(
+                    convertHeicToJpeg(bytes),
+                    replaceExtension(fileName, ".jpg"),
+                    "image/jpeg"
+            );
+        } catch (IOException e) {
+            log.warn("Storing original HEIC/HEIF photo because JPEG conversion failed for {}", fileName, e);
+            return new PreparedPhoto(bytes, fileName, normalizeContentType(contentType));
+        }
     }
 
     private boolean isHeic(String fileName, String contentType) {
@@ -172,6 +150,7 @@ public class PhotoStorageService {
     private byte[] convertHeicToJpeg(byte[] bytes) throws IOException {
         IOException lastFailure = null;
         for (List<String> command : List.of(
+                List.of("heif-convert", "%s", "%s"),
                 List.of("magick", "%s", "%s"),
                 List.of("convert", "%s", "%s")
         )) {
@@ -183,7 +162,7 @@ public class PhotoStorageService {
         }
 
         throw new IOException(
-                "HEIC/HEIF conversion failed. Install ImageMagick with HEIC support (libheif) in the checkin-service runtime.",
+                "HEIC/HEIF conversion failed. Install heif-convert/ImageMagick with HEIC decoder support in the checkin-service runtime.",
                 lastFailure
         );
     }
@@ -224,10 +203,4 @@ public class PhotoStorageService {
         }
     }
 
-    private String normalizePrefix(String prefix) {
-        if (prefix == null || prefix.isBlank()) {
-            return "";
-        }
-        return prefix.endsWith("/") ? prefix : prefix + "/";
-    }
 }

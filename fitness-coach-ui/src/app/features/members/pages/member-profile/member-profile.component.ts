@@ -49,6 +49,7 @@ type BodyMetricSourceField =
 export class MemberProfileComponent implements OnInit {
   private readonly expirySoonDays = 7;
   @ViewChild('comparisonModal') comparisonModalRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('comparisonCapture') comparisonCaptureRef?: ElementRef<HTMLDivElement>;
 
   member: any = null;
   loading = true;
@@ -93,6 +94,7 @@ export class MemberProfileComponent implements OnInit {
   showProgressComparisonModal = false;
   isProgressComparisonMaximized = false;
   comparisonZoomLevel = 1;
+  capturingComparison = false;
   activeSection: 'overview' | 'bodyMetrics' | 'billing' | 'progress' | 'dailyConsistency' | 'workout' | 'diet' = 'overview';
   totalPaid = 0;
   totalPending = 0;
@@ -917,6 +919,18 @@ get displayedRenewalDate(): string {
   return this.overrideRenewalDate || this.subscription?.endDate || '-';
 }
 
+get displayedCurrentPlan(): string {
+  const planName = String(this.subscription?.planName || '').trim();
+  if (planName) return planName;
+
+  const cycle = String(this.overrideCycle || this.subscription?.cycle || '').toUpperCase();
+  if ((this.overrideActiveSince || this.overrideRenewalDate) && cycle) {
+    return this.getCycleLabel(cycle);
+  }
+
+  return 'No Plan';
+}
+
 get renewalDaysRemaining(): number | null {
   if (!this.displayedRenewalDate || this.displayedRenewalDate === '-') return null;
 
@@ -1015,6 +1029,12 @@ private applyCycleToRenewal() {
   if (Number.isNaN(start.getTime())) return;
   start.setMonth(start.getMonth() + cycleMonths);
   this.overrideRenewalDate = start.toISOString().slice(0, 10);
+}
+
+private getCycleLabel(cycle: string): string {
+  if (cycle === 'QUARTERLY') return 'Quarterly';
+  if (cycle === 'YEARLY') return 'Yearly';
+  return 'Monthly';
 }
 
 private getOverrideStorageKey() {
@@ -1295,7 +1315,7 @@ loadCheckinPhotos(checkInId: string) {
 // }
 
 getCheckinPhotoUrl(fileName: string): string {
-  return `${this.env.checkinApi}/checkin/photos/file/${(fileName)}`;
+  return this.photoApi.getPhotoUrl(fileName);
 }
 
 getSortedCheckins() {
@@ -1711,7 +1731,7 @@ loadProgressCheckins() {
 }
 
 getPhotoUrl(fileName: string) {
-  return `${this.env.checkinApi}/checkin/photos/file/${fileName}`;
+  return this.photoApi.getPhotoUrl(fileName);
 }
 
   prepareComparison() {
@@ -1819,6 +1839,43 @@ zoomOutComparison() {
 
 resetComparisonZoom() {
   this.comparisonZoomLevel = 1;
+}
+
+async captureProgressComparison() {
+  const captureElement = this.comparisonCaptureRef?.nativeElement;
+  if (!captureElement || this.capturingComparison) return;
+
+  this.capturingComparison = true;
+  const previousZoom = this.comparisonZoomLevel;
+  this.comparisonZoomLevel = 1;
+  this.cdr.detectChanges();
+
+  try {
+    await this.waitForComparisonImages(captureElement);
+    const html2canvas = (await import('html2canvas')).default;
+
+    const canvas = await html2canvas(captureElement, {
+      backgroundColor: '#fffefb',
+      scale: Math.min(window.devicePixelRatio || 1, 2),
+      useCORS: true,
+      allowTaint: false,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: captureElement.scrollWidth,
+      windowHeight: captureElement.scrollHeight
+    });
+
+    const link = document.createElement('a');
+    link.download = this.getProgressComparisonFileName();
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch {
+    alert('Unable to capture screenshot. Please wait for photos to load and try again.');
+  } finally {
+    this.comparisonZoomLevel = previousZoom;
+    this.capturingComparison = false;
+    this.cdr.detectChanges();
+  }
 }
 
 @HostListener('document:fullscreenchange')
@@ -1935,6 +1992,36 @@ private getCheckinDateValue(value: string | null | undefined): number {
 
 private roundToTwo(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+private async waitForComparisonImages(element: HTMLElement): Promise<void> {
+  const images = Array.from(element.querySelectorAll('img')) as HTMLImageElement[];
+  await Promise.all(images.map((image) => {
+    if (image.complete && image.naturalWidth > 0) {
+      return Promise.resolve();
+    }
+
+    if (typeof image.decode === 'function') {
+      return image.decode().catch(() => undefined);
+    }
+
+    return new Promise<void>((resolve) => {
+      image.onload = () => resolve();
+      image.onerror = () => resolve();
+    });
+  }));
+}
+
+private getProgressComparisonFileName(): string {
+  const memberName = String(this.member?.fullName || 'Member')
+    .replace(/[<>:"/\\|?*\x00-\x1F\x7F]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'Member';
+  const currentDate = this.formatProgressCheckinDate(this.currentCheckin?.submittedAt).replace(/\s+/g, '-');
+  const previousDate = this.formatProgressCheckinDate(this.previousCheckin?.submittedAt).replace(/\s+/g, '-');
+
+  return `Progress-Comparison-${memberName}-${currentDate}-vs-${previousDate}.png`;
 }
 
 private initializeConfirmPaymentDates(): void {

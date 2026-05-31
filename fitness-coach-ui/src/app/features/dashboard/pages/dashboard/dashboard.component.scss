@@ -67,6 +67,55 @@
   color: var(--text-muted);
 }
 
+.pending-review-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pending-review-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  padding: 8px 10px;
+  color: #111827;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.pending-review-list button:hover {
+  border-color: #2563eb;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.12);
+}
+
+.pending-review-list span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pending-review-list strong {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pending-review-list em,
+.pending-review-list small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
 .loading {
   font-size: 18px;
   font-weight: 500;

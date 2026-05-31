@@ -74,6 +74,8 @@ public class Member {
     @Column(nullable = false)
     private MemberStatus status;
 
+    private Instant inactiveAt;
+
     @Column(nullable = false)
     private Instant createdAt;
     private Instant updatedAt;

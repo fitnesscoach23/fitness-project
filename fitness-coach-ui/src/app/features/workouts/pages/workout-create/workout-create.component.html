@@ -77,50 +77,6 @@
             </div>
           </ng-template>
         </div>
-
-        <div class="plan-actions">
-          <button
-            *ngIf="editablePlanId !== p.id"
-            type="button"
-            class="btn btn-secondary"
-            (click)="enableEdit(p)">
-            Edit
-          </button>
-
-          <button
-            *ngIf="editablePlanId === p.id"
-            type="button"
-            class="btn btn-secondary"
-            (click)="addRowToPlan(p)">
-            + Add Row
-          </button>
-
-          <button
-            type="button"
-            class="btn btn-danger"
-            (click)="deletePlan(p)"
-            [disabled]="deletingPlanId === p.id">
-            {{ deletingPlanId === p.id ? 'Deleting...' : 'Delete Plan' }}
-          </button>
-
-          <button
-            *ngIf="editablePlanId === p.id"
-            type="button"
-            class="btn btn-primary"
-            (click)="savePlan(p)"
-            [disabled]="savingPlanId === p.id">
-            {{ savingPlanId === p.id ? 'Saving...' : 'Save' }}
-          </button>
-
-          <button
-            *ngIf="editablePlanId === p.id"
-            type="button"
-            class="btn btn-secondary"
-            (click)="cancelEdit(p)"
-            [disabled]="savingPlanId === p.id">
-            Cancel
-          </button>
-        </div>
       </header>
 
       <div class="day-groups">
@@ -275,6 +231,50 @@
           </table>
         </div>
       </section>
+
+      <div class="plan-actions plan-footer-actions">
+        <button
+          *ngIf="editablePlanId !== p.id"
+          type="button"
+          class="btn btn-secondary"
+          (click)="enableEdit(p)">
+          Edit
+        </button>
+
+        <button
+          *ngIf="editablePlanId === p.id"
+          type="button"
+          class="btn btn-secondary"
+          (click)="addRowToPlan(p)">
+          + Add Row
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-danger"
+          (click)="deletePlan(p)"
+          [disabled]="deletingPlanId === p.id">
+          {{ deletingPlanId === p.id ? 'Deleting...' : 'Delete Plan' }}
+        </button>
+
+        <button
+          *ngIf="editablePlanId === p.id"
+          type="button"
+          class="btn btn-primary"
+          (click)="savePlan(p)"
+          [disabled]="savingPlanId === p.id">
+          {{ savingPlanId === p.id ? 'Saving...' : 'Save' }}
+        </button>
+
+        <button
+          *ngIf="editablePlanId === p.id"
+          type="button"
+          class="btn btn-secondary"
+          (click)="cancelEdit(p)"
+          [disabled]="savingPlanId === p.id">
+          Cancel
+        </button>
+      </div>
     </article>
   </section>
 

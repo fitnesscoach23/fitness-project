@@ -5,8 +5,10 @@ import com.coach.member.entity.Member;
 import com.coach.member.entity.MemberStatus;
 import com.coach.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,11 +24,12 @@ public class MemberService {
 
     public UUID createMember(String coachEmail, CreateMemberRequest req) {
         String normalizedEmail = normalize(req.email());
-        Member member = findExistingMember(coachEmail, normalizedEmail)
-                .orElseGet(() -> Member.builder()
-                        .coachEmail(coachEmail)
-                        .createdAt(Instant.now())
-                        .build());
+        validateEmailAvailable(coachEmail, normalizedEmail, null);
+
+        Member member = Member.builder()
+                .coachEmail(coachEmail)
+                .createdAt(Instant.now())
+                .build();
 
         applyCreateRequest(member, req);
         member.setUpdatedAt(Instant.now());
@@ -51,6 +54,10 @@ public class MemberService {
         Member m = repository.findById(id)
                 .filter(mem -> mem.getCoachEmail().equals(coachEmail))
                 .orElseThrow(() -> new RuntimeException("Member not found"));
+
+        if (req.email() != null) {
+            validateEmailAvailable(coachEmail, normalize(req.email()), id);
+        }
 
         if (req.fullName() != null) m.setFullName(req.fullName());
         if (req.email() != null) m.setEmail(normalize(req.email()));
@@ -97,7 +104,7 @@ public class MemberService {
         if (req.frontView() != null) m.setFrontView(req.frontView());
         if (req.sideView() != null) m.setSideView(req.sideView());
         if (req.backView() != null) m.setBackView(req.backView());
-        if (req.status() != null) m.setStatus(req.status());
+        if (req.status() != null) applyStatusChange(m, req.status());
         if (req.notes() != null) m.setNotes(req.notes());
         m.setUpdatedAt(Instant.now());
 
@@ -108,7 +115,7 @@ public class MemberService {
         Member m = repository.findById(id)
                 .filter(mem -> mem.getCoachEmail().equals(coachEmail))
                 .orElseThrow(() -> new RuntimeException("Member not found"));
-        m.setStatus(status);
+        applyStatusChange(m, status);
         m.setUpdatedAt(Instant.now());
         repository.save(m);
     }
@@ -171,6 +178,7 @@ public class MemberService {
                 m.getSideView(),
                 m.getBackView(),
                 m.getStatus(),
+                m.getInactiveAt(),
                 m.getNotes(),
                 bodyMetrics,
                 m.getCreatedAt(),
@@ -183,6 +191,17 @@ public class MemberService {
             return Optional.empty();
         }
         return repository.findByCoachEmailAndEmailIgnoreCase(coachEmail, normalizedEmail);
+    }
+
+    private void validateEmailAvailable(String coachEmail, String normalizedEmail, UUID currentMemberId) {
+        findExistingMember(coachEmail, normalizedEmail)
+                .filter(existing -> currentMemberId == null || !existing.getId().equals(currentMemberId))
+                .ifPresent(existing -> {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "A member with this email already exists"
+                    );
+                });
     }
 
     private String normalize(String value) {
@@ -238,11 +257,24 @@ public class MemberService {
         member.setFrontView(req.frontView());
         member.setSideView(req.sideView());
         member.setBackView(req.backView());
-        if (req.status() != null) {
-            member.setStatus(req.status());
-        } else if (member.getStatus() == null) {
-            member.setStatus(MemberStatus.ACTIVE);
-        }
+        applyStatusChange(member, req.status() == null ? MemberStatus.ACTIVE : req.status());
         member.setNotes(req.notes());
+    }
+
+    private void applyStatusChange(Member member, MemberStatus status) {
+        if (status == null) {
+            return;
+        }
+
+        MemberStatus previousStatus = member.getStatus();
+        member.setStatus(status);
+
+        if (status == MemberStatus.INACTIVE) {
+            if (previousStatus != MemberStatus.INACTIVE || member.getInactiveAt() == null) {
+                member.setInactiveAt(Instant.now());
+            }
+        } else {
+            member.setInactiveAt(null);
+        }
     }
 }

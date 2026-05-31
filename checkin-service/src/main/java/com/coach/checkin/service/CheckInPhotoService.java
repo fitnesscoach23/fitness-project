@@ -20,15 +20,18 @@ public class CheckInPhotoService {
     private final CheckInPhotoRepository photoRepo;
     private final PhotoStorageService storageService;
 
-    public UUID uploadPhoto(String coachEmail, UUID checkInId, MultipartFile file) throws Exception {
+    public UUID uploadPhoto(String coachEmail, UUID checkInId, String memberName, MultipartFile file) throws Exception {
         CheckIn ci = checkInRepo.findById(checkInId)
                 .filter(c -> c.getCoachEmail().equals(coachEmail))
                 .orElseThrow(() -> new RuntimeException("Check-in not found"));
 
         UUID photoId = UUID.randomUUID();
 
-        // let storage service generate filename and normalize browser-hostile formats
-        PhotoStorageService.SavedPhoto storedPhoto = storageService.savePhoto(photoId, file);
+        PhotoStorageService.SavedPhoto storedPhoto = storageService.savePhoto(
+                photoId,
+                memberName != null && !memberName.isBlank() ? memberName : ci.getMemberId().toString(),
+                file
+        );
 
         CheckInPhoto photo = CheckInPhoto.builder()
                 .id(photoId)

@@ -351,7 +351,7 @@ export class CheckinCreateComponent implements OnInit {
     request$.subscribe({
       next: (checkInId: string) => {
         if (this.editingCheckinId) {
-          this.finish();
+          this.uploadEditedPhotos(this.editingCheckinId);
           return;
         }
 
@@ -368,10 +368,11 @@ export class CheckinCreateComponent implements OnInit {
   }
 
   private uploadPhotos(checkInId: string) {
+    const memberName = this.getSelectedMemberName();
     const uploads = [
-      this.photoApi.upload(checkInId, 'FRONT', this.frontPhoto!),
-      this.photoApi.upload(checkInId, 'SIDE', this.sidePhoto!),
-      this.photoApi.upload(checkInId, 'BACK', this.backPhoto!)
+      this.photoApi.upload(checkInId, 'FRONT', this.frontPhoto!, memberName),
+      this.photoApi.upload(checkInId, 'SIDE', this.sidePhoto!, memberName),
+      this.photoApi.upload(checkInId, 'BACK', this.backPhoto!, memberName)
     ];
 
     forkJoin(uploads).subscribe({
@@ -379,6 +380,34 @@ export class CheckinCreateComponent implements OnInit {
       error: () => {
         this.loading = false;
         this.error = 'Check-in saved, but photo upload failed';
+      }
+    });
+  }
+
+  private uploadEditedPhotos(checkInId: string) {
+    const memberName = this.getSelectedMemberName();
+    const uploads: ReturnType<ProgressCheckinPhotoApiService['upload']>[] = [];
+
+    if (this.frontPhoto) {
+      uploads.push(this.photoApi.upload(checkInId, 'FRONT', this.frontPhoto, memberName));
+    }
+    if (this.sidePhoto) {
+      uploads.push(this.photoApi.upload(checkInId, 'SIDE', this.sidePhoto, memberName));
+    }
+    if (this.backPhoto) {
+      uploads.push(this.photoApi.upload(checkInId, 'BACK', this.backPhoto, memberName));
+    }
+
+    if (!uploads.length) {
+      this.finish();
+      return;
+    }
+
+    forkJoin(uploads).subscribe({
+      next: () => this.finish(),
+      error: () => {
+        this.loading = false;
+        this.error = 'Check-in updated, but photo upload failed';
       }
     });
   }
@@ -508,6 +537,11 @@ onPhotoSelected(
 
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  }
+
+  private getSelectedMemberName(): string {
+    const member = this.members.find(m => m.id === this.memberId);
+    return member?.fullName || 'Unknown Member';
   }
 
   deleteHistoryItem(checkInId: string) {

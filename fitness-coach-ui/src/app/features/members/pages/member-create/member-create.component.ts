@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MemberApiService } from '../../../../core/api/member-api.service';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 
 declare const XLSX: any;
 
@@ -222,25 +223,52 @@ export class MemberCreateComponent {
   }
 
   submit() {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
-  if (this.form.invalid) {
-    this.form.markAllAsTouched();
-    return;
+    this.loading = true;
+    this.error = null;
+
+    const payload = this.form.getRawValue();
+
+    this.memberApi.createMember(payload).subscribe({
+      next: () => {
+        this.router.navigate(['/members']);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading = false;
+        this.error = this.getCreateErrorMessage(err);
+      }
+    });
   }
 
-  this.loading = true;
-  this.error = null;
-
-  const payload = this.form.getRawValue();
-
-  this.memberApi.createMember(payload).subscribe({
-    next: () => {
-      this.router.navigate(['/members']);
-    },
-    error: () => {
-      this.loading = false;
-      this.error = 'Failed to create member';
+  private getCreateErrorMessage(err: HttpErrorResponse): string {
+    if (err.status === 409) {
+      return this.extractServerMessage(err) || 'A member with this email already exists.';
     }
-  });
-}
+
+    return this.extractServerMessage(err) || 'Failed to create member';
+  }
+
+  private extractServerMessage(err: HttpErrorResponse): string | null {
+    if (typeof err.error === 'string' && err.error.trim()) {
+      return err.error;
+    }
+
+    if (err.error?.detail) {
+      return err.error.detail;
+    }
+
+    if (err.error?.message) {
+      return err.error.message;
+    }
+
+    if (err.message) {
+      return err.message;
+    }
+
+    return null;
+  }
 }

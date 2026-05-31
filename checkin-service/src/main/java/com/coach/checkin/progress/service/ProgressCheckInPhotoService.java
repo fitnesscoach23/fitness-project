@@ -27,6 +27,7 @@ public class ProgressCheckInPhotoService {
             String coachEmail,
             UUID checkInId,
             String type,
+            String memberName,
             MultipartFile file
     ) throws Exception {
 
@@ -34,9 +35,14 @@ public class ProgressCheckInPhotoService {
                 .filter(c -> c.getCoachEmail().equals(coachEmail))
                 .orElseThrow(() -> new RuntimeException("Check-in not found"));
 
-        // Save file first (filename generation and HEIC normalization handled by storage)
         UUID tempId = UUID.randomUUID();
-        PhotoStorageService.SavedPhoto storedPhoto = storageService.savePhoto(tempId, file);
+        PhotoStorageService.SavedPhoto storedPhoto = storageService.savePhoto(
+                tempId,
+                memberName != null && !memberName.isBlank() ? memberName : checkIn.getMemberId().toString(),
+                file
+        );
+
+        repo.deleteAll(repo.findByCheckInIdAndType(checkInId, type));
 
         ProgressCheckInPhoto photo = ProgressCheckInPhoto.builder()
                 .checkInId(checkInId)
@@ -51,10 +57,6 @@ public class ProgressCheckInPhotoService {
 
         return saved.getId();
     }
-
-
-
-
     public List<ProgressCheckInPhoto> list(
             String coachEmail,
             UUID checkInId
@@ -67,10 +69,4 @@ public class ProgressCheckInPhotoService {
         return repo.findByCheckInId(checkInId);
     }
 
-    private String getExtension(String originalName) {
-        if (originalName == null || !originalName.contains(".")) {
-            return "";
-        }
-        return originalName.substring(originalName.lastIndexOf('.'));
-    }
 }

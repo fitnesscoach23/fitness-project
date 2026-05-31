@@ -33,9 +33,12 @@ getCheckinPhotos(checkinId: string) {
   );
 }
 
-uploadCheckinPhotos(checkinId: string, files: File[]) {
+uploadCheckinPhotos(checkinId: string, files: File[], memberName?: string) {
   const formData = new FormData();
   files.forEach(file => formData.append('file', file));
+  if (memberName) {
+    formData.append('memberName', memberName);
+  }
 
   return this.http.post(
     `${environment.checkinApi}/checkin/photos/${checkinId}`,
@@ -44,8 +47,14 @@ uploadCheckinPhotos(checkinId: string, files: File[]) {
 }
 
 getCheckinPhotoUrl(fileName: string): string {
-  return `${environment.checkinApi}/checkin/photos/file/${fileName}`;
+  return `${environment.checkinApi}/checkin/photos/file/${this.encodePhotoPath(fileName)}`;
 }
 
+private encodePhotoPath(fileName: string): string {
+  return String(fileName || '')
+    .split('/')
+    .map(segment => encodeURIComponent(segment))
+    .join('/');
+}
 
 }

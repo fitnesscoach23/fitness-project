@@ -54,6 +54,7 @@ public record MemberResponse(
         String sideView,
         String backView,
         MemberStatus status,
+        Instant inactiveAt,
         String notes,
         BodyMetricsResponse bodyMetrics,
         Instant createdAt,

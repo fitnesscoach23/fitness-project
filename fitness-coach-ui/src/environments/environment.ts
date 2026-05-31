@@ -1,10 +1,10 @@
 export const environment = {
   production: false,
-  authApi: 'http://localhost:8080',
-  memberApi: 'http://localhost:8080',
-  workoutApi: 'http://localhost:8080',
-  dietApi: 'http://localhost:8080',
-  checkinApi: 'http://localhost:8080',
-  billingApi: 'http://localhost:8080',
-  notificationApi: 'http://localhost:8080'
+  authApi: 'http://127.0.0.1:8080',
+  memberApi: 'http://127.0.0.1:8080',
+  workoutApi: 'http://127.0.0.1:8080',
+  dietApi: 'http://127.0.0.1:8080',
+  checkinApi: 'http://127.0.0.1:8080',
+  billingApi: 'http://127.0.0.1:8080',
+  notificationApi: 'http://127.0.0.1:8080'
 };

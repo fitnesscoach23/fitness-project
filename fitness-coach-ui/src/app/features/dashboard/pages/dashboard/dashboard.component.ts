@@ -44,6 +44,14 @@ type CheckinReminderRow = {
   latestNotes: string;
 };
 
+type PendingReviewRow = {
+  memberId: string;
+  fullName: string;
+  email: string;
+  checkinDate: string;
+  status: string;
+};
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -67,6 +75,7 @@ export class DashboardComponent implements OnInit {
   revenueTrendLabel = 'No revenue last month';
   weeklyCheckinCount = 0;
   pendingReviewCount = 0;
+  pendingReviewRows: PendingReviewRow[] = [];
   dueSoonMembers: DueSoonMember[] = [];
   selectedDueMember: DueSoonMember | null = null;
   snapshotDraftAmount: number | null = null;
@@ -98,15 +107,22 @@ export class DashboardComponent implements OnInit {
     this.memberApi.getMembers().subscribe({
       next: (res: any) => {
         const members = res || [];
-        this.members = members;
-        this.totalMembers = members.length || 0;
-        if (!this.checkinCadenceMemberId && members.length) {
-          this.checkinCadenceMemberId = members[0].id;
-          this.checkinCadenceDays = this.getStoredCheckinCadenceDays(members[0].id) || 7;
+        const activeMembers = members.filter((member: any) => this.isActiveMember(member));
+        this.members = activeMembers;
+        this.totalMembers = activeMembers.length || 0;
+        if (
+          this.checkinCadenceMemberId &&
+          !activeMembers.some((member: any) => member.id === this.checkinCadenceMemberId)
+        ) {
+          this.checkinCadenceMemberId = '';
+        }
+        if (!this.checkinCadenceMemberId && activeMembers.length) {
+          this.checkinCadenceMemberId = activeMembers[0].id;
+          this.checkinCadenceDays = this.getStoredCheckinCadenceDays(activeMembers[0].id) || 7;
         }
         this.loading = false;
-        this.loadDueSoonBilling(members);
-        this.loadDashboardKpis(members);
+        this.loadDueSoonBilling(activeMembers);
+        this.loadDashboardKpis(activeMembers);
       },
       error: () => {
         this.loading = false;
@@ -244,6 +260,16 @@ export class DashboardComponent implements OnInit {
 
   selectCheckinMember(member: CheckinReminderRow): void {
     this.selectedCheckinMember = member;
+    this.checkinCadenceMemberId = member.id;
+    this.checkinCadenceDays = member.cadenceDays || 7;
+  }
+
+  selectPendingReview(row: PendingReviewRow): void {
+    const member = this.checkinReminderRows.find((item) => item.id === row.memberId);
+    if (!member) return;
+
+    this.activeSmartPanel = 'checkins';
+    this.selectCheckinMember(member);
   }
 
   getCheckinMetricValue(value: number | null, suffix = ''): string {
@@ -454,7 +480,7 @@ export class DashboardComponent implements OnInit {
             fullName: member.fullName,
             email: member.email,
             phone: member.phone || '',
-            planName: subscription?.planName || 'No Plan',
+            planName: this.getBillingPlanName(subscription, override, renewalDate),
             activeSince: override?.activeSince || subscription?.startDate || '',
             renewalDate,
             daysRemaining,
@@ -509,20 +535,37 @@ export class DashboardComponent implements OnInit {
         payments: this.billingApi.getPaymentHistory(member.id).pipe(
           catchError(() => of([]))
         ),
+        subscription: this.billingApi.getSubscription(member.id).pipe(
+          map((res: any[]) => (res?.length ? res[0] : null)),
+          catchError(() => of(null))
+        ),
         progressCheckins: this.progressCheckinApi.getCheckinsByMember(member.id).pipe(
           catchError(() => of([]))
         )
       }).pipe(
-        map(({ workoutPlans, dietPlan, payments, progressCheckins }) => ({
-          workoutCount: this.countActiveWorkoutPlans(workoutPlans),
-          dietCount: this.countDietPlans(dietPlan),
-          currentMonthRevenue: this.sumPaymentsForMonth(payments || [], 0),
-          previousMonthRevenue: this.sumPaymentsForMonth(payments || [], -1),
-          weeklyCheckins: (progressCheckins || []).filter((checkin: any) =>
+        map(({ workoutPlans, dietPlan, payments, subscription, progressCheckins }) => {
+          const weeklyCheckins = (progressCheckins || []).filter((checkin: any) =>
             this.isCurrentWeek(checkin.submittedAt || checkin.checkInDate || checkin.createdAt)
-          ),
-          checkinReminder: this.buildCheckinReminderRow(member, progressCheckins || []),
-        }))
+          );
+
+          return {
+            workoutCount: this.countActiveWorkoutPlans(workoutPlans),
+            dietCount: this.countDietPlans(dietPlan),
+            currentMonthRevenue: this.sumPaymentsForMonth(payments || [], 0),
+            previousMonthRevenue: this.sumPaymentsForMonth(payments || [], -1),
+            weeklyCheckins,
+            pendingReviews: weeklyCheckins
+              .filter((checkin: any) => this.isPendingReview(checkin))
+              .map((checkin: any) => ({
+                memberId: member.id,
+                fullName: member.fullName,
+                email: member.email,
+                checkinDate: checkin.submittedAt || checkin.checkInDate || checkin.createdAt || '',
+                status: this.getCheckinReviewStatusLabel(checkin)
+              } as PendingReviewRow)),
+            checkinReminder: this.buildCheckinReminderRow(member, progressCheckins || [], subscription),
+          };
+        })
       )
     );
 
@@ -537,7 +580,8 @@ export class DashboardComponent implements OnInit {
 
         this.revenueTrendLabel = this.getRevenueTrendLabel(this.monthlyRevenue, previousMonthRevenue);
         this.weeklyCheckinCount = weeklyCheckins.length;
-        this.pendingReviewCount = weeklyCheckins.filter((checkin: any) => this.isPendingReview(checkin)).length;
+        this.pendingReviewRows = rows.flatMap((row) => row.pendingReviews);
+        this.pendingReviewCount = this.pendingReviewRows.length;
         this.checkinReminderRows = rows
           .map((row) => row.checkinReminder)
           .filter((row): row is CheckinReminderRow => !!row)
@@ -571,6 +615,7 @@ export class DashboardComponent implements OnInit {
     this.revenueTrendLabel = 'No revenue last month';
     this.weeklyCheckinCount = 0;
     this.pendingReviewCount = 0;
+    this.pendingReviewRows = [];
   }
 
   private countActiveWorkoutPlans(value: any): number {
@@ -632,17 +677,31 @@ export class DashboardComponent implements OnInit {
   }
 
   private isPendingReview(checkin: any): boolean {
-    const status = String(checkin?.status || checkin?.reviewStatus || '').toUpperCase();
+    const rawStatus = checkin?.status || checkin?.reviewStatus;
+    const status = String(rawStatus || '').toUpperCase();
     if (['REVIEWED', 'APPROVED', 'DONE', 'COMPLETED'].includes(status)) return false;
     if (['PENDING', 'PENDING_REVIEW', 'SUBMITTED', 'NEW'].includes(status)) return true;
     if (typeof checkin?.reviewed === 'boolean') return !checkin.reviewed;
     if (typeof checkin?.isReviewed === 'boolean') return !checkin.isReviewed;
-    return !checkin?.reviewedAt;
+    if (checkin?.reviewedAt) return false;
+    return false;
   }
 
-  private buildCheckinReminderRow(member: any, checkins: any[]): CheckinReminderRow | null {
+  private getCheckinReviewStatusLabel(checkin: any): string {
+    const status = String(checkin?.status || checkin?.reviewStatus || '').trim();
+    if (status) return status.replace(/_/g, ' ');
+    if (typeof checkin?.reviewed === 'boolean') return checkin.reviewed ? 'Reviewed' : 'Pending';
+    if (typeof checkin?.isReviewed === 'boolean') return checkin.isReviewed ? 'Reviewed' : 'Pending';
+    return checkin?.reviewedAt ? 'Reviewed' : 'Pending';
+  }
+
+  private buildCheckinReminderRow(member: any, checkins: any[], subscription: any | null = null): CheckinReminderRow | null {
     const cadenceDays = this.getStoredCheckinCadenceDays(member.id);
-    const lastCheckinDate = this.getLatestProgressCheckinDate(checkins);
+    const latestProgressCheckinDate = this.getLatestProgressCheckinDate(checkins);
+    const activeSinceDate = this.getCheckinActiveSinceDate(member, subscription);
+    const lastCheckinDate = checkins.length === 1
+      ? activeSinceDate
+      : latestProgressCheckinDate || activeSinceDate;
     const nextCheckinDate = cadenceDays && lastCheckinDate
       ? this.addDays(lastCheckinDate, cadenceDays)
       : cadenceDays
@@ -701,6 +760,18 @@ export class DashboardComponent implements OnInit {
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
 
     return latest || '';
+  }
+
+  private getCheckinActiveSinceDate(member: any, subscription: any | null): string {
+    const override = this.getStoredOverride(member.id);
+
+    return this.normalizeDateInput(
+      override?.activeSince
+      || subscription?.startDate
+      || member?.activeSince
+      || member?.createdAt
+      || ''
+    );
   }
 
   private getCheckinDateValue(value: string | null | undefined): number {
@@ -806,6 +877,19 @@ export class DashboardComponent implements OnInit {
     );
   }
 
+  private getBillingPlanName(subscription: any, override: any | null, renewalDate = ''): string {
+    const planName = String(subscription?.planName || '').trim();
+    if (planName) return planName;
+
+    const cycle = String(override?.cycle || subscription?.cycle || subscription?.billingCycle || subscription?.duration || '').toUpperCase();
+    if (cycle.includes('QUARTER') || cycle === '3') return 'Quarterly';
+    if (cycle.includes('YEAR') || cycle === '12') return 'Yearly';
+    if (cycle.includes('MONTH') || cycle === '1') return 'Monthly';
+    if (override?.activeSince || override?.renewalDate || subscription?.startDate || subscription?.endDate || renewalDate) return 'Monthly';
+
+    return 'No Plan';
+  }
+
   private normalizeDateInput(value: string): string {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return '';
@@ -891,5 +975,9 @@ export class DashboardComponent implements OnInit {
 
   private getCheckinCadenceStorageKey(memberId: string): string {
     return `dashboard_progress_checkin_cadence_${memberId}`;
+  }
+
+  private isActiveMember(member: any): boolean {
+    return String(member?.status || 'ACTIVE').toUpperCase() !== 'INACTIVE';
   }
 }

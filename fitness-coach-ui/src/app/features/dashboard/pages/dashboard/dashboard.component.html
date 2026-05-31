@@ -73,6 +73,19 @@
       <div class="kpi-meta" *ngIf="!kpiLoading">
         {{ pendingReviewCount }} pending review
       </div>
+
+      <div class="pending-review-list" *ngIf="!kpiLoading && pendingReviewRows.length">
+        <button
+          type="button"
+          *ngFor="let review of pendingReviewRows"
+          (click)="selectPendingReview(review)">
+          <span>
+            <strong>{{ review.fullName }}</strong>
+            <em>{{ formatDate(review.checkinDate) }}</em>
+          </span>
+          <small>{{ review.status }}</small>
+        </button>
+      </div>
     </div>
 
   </div>
@@ -220,13 +233,8 @@
 
               <div class="checkin-summary-footer">
                 <div>
-                  <span>Current vs Previous</span>
-                  <strong>
-                    {{ formatDate(selectedCheckinMember.latestCheckin?.submittedAt || selectedCheckinMember.latestCheckin?.checkInDate || selectedCheckinMember.latestCheckin?.createdAt) }}
-                    <ng-container *ngIf="selectedCheckinMember.previousCheckin">
-                      vs {{ formatDate(selectedCheckinMember.previousCheckin?.submittedAt || selectedCheckinMember.previousCheckin?.checkInDate || selectedCheckinMember.previousCheckin?.createdAt) }}
-                    </ng-container>
-                  </strong>
+                  <span>Check-in Base Date</span>
+                  <strong>{{ formatDate(selectedCheckinMember.lastCheckinDate) }}</strong>
                 </div>
                 <div>
                   <span>Next Due</span>

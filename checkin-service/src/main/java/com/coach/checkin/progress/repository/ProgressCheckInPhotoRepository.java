@@ -10,4 +10,6 @@ public interface ProgressCheckInPhotoRepository
         extends JpaRepository<ProgressCheckInPhoto, UUID> {
 
     List<ProgressCheckInPhoto> findByCheckInId(UUID checkInId);
+
+    List<ProgressCheckInPhoto> findByCheckInIdAndType(UUID checkInId, String type);
 }

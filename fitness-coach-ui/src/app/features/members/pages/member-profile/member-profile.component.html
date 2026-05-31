@@ -62,7 +62,7 @@
   <div class="stat-item">
     <div class="stat-label">Current Plan</div>
     <div class="stat-value">
-      {{ subscription?.planName || 'No Plan' }}
+      {{ displayedCurrentPlan }}
     </div>
   </div>
 
@@ -191,7 +191,7 @@
 
       <div>
         <label>Plan</label>
-        <span>{{ subscription.planName || 'No Plan' }}</span>
+        <span>{{ displayedCurrentPlan }}</span>
       </div>
 
       <div>
@@ -644,6 +644,13 @@
             (click)="toggleProgressComparisonMaximize()">
             {{ isProgressComparisonMaximized ? 'Restore' : 'Maximize' }}
           </button>
+          <button
+            type="button"
+            class="secondary-btn"
+            [disabled]="capturingComparison"
+            (click)="captureProgressComparison()">
+            {{ capturingComparison ? 'Capturing...' : 'Capture Screenshot' }}
+          </button>
           <button type="button" class="secondary-btn" (click)="closeProgressComparison()">Close</button>
         </div>
       </div>
@@ -652,7 +659,7 @@
         class="comparison-zoom-shell"
         [style.transform]="'scale(' + comparisonZoomLevel + ')'"
         [style.transformOrigin]="'top center'">
-        <div class="comparison-grid">
+        <div #comparisonCapture class="comparison-grid">
           <div class="comparison-summary-card">
             <div class="comparison-summary-title">Member Summary</div>
 
@@ -702,6 +709,7 @@
               <img
                 *ngIf="getPhotoByType(currentCheckin?.id, 'FRONT') as currentFront; else noCurrentFront"
                 [src]="getCheckinPhotoUrl(currentFront)"
+                crossorigin="anonymous"
                 class="comparison-photo"
               />
               <ng-template #noCurrentFront>
@@ -713,6 +721,7 @@
               <img
                 *ngIf="getPhotoByType(previousCheckin?.id, 'FRONT') as previousFront; else noPreviousFront"
                 [src]="getCheckinPhotoUrl(previousFront)"
+                crossorigin="anonymous"
                 class="comparison-photo"
               />
               <ng-template #noPreviousFront>
@@ -728,6 +737,7 @@
               <img
                 *ngIf="getPhotoByType(currentCheckin?.id, 'SIDE') as currentSide; else noCurrentSide"
                 [src]="getCheckinPhotoUrl(currentSide)"
+                crossorigin="anonymous"
                 class="comparison-photo"
               />
               <ng-template #noCurrentSide>
@@ -739,6 +749,7 @@
               <img
                 *ngIf="getPhotoByType(previousCheckin?.id, 'SIDE') as previousSide; else noPreviousSide"
                 [src]="getCheckinPhotoUrl(previousSide)"
+                crossorigin="anonymous"
                 class="comparison-photo"
               />
               <ng-template #noPreviousSide>
@@ -754,6 +765,7 @@
               <img
                 *ngIf="getPhotoByType(currentCheckin?.id, 'BACK') as currentBack; else noCurrentBack"
                 [src]="getCheckinPhotoUrl(currentBack)"
+                crossorigin="anonymous"
                 class="comparison-photo"
               />
               <ng-template #noCurrentBack>
@@ -765,6 +777,7 @@
               <img
                 *ngIf="getPhotoByType(previousCheckin?.id, 'BACK') as previousBack; else noPreviousBack"
                 [src]="getCheckinPhotoUrl(previousBack)"
+                crossorigin="anonymous"
                 class="comparison-photo"
               />
               <ng-template #noPreviousBack>

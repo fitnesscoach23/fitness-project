@@ -14,7 +14,12 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends imagemagick libheif1 \
+    && apt-get install -y --no-install-recommends \
+        imagemagick \
+        libde265-0 \
+        libheif1 \
+        libheif-examples \
+        libheif-plugin-libde265 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /workspace/target/*.jar app.jar

@@ -27,10 +27,6 @@
   </section>
 
   <section *ngIf="memberSelected" class="editor-card">
-    <div class="top-actions" *ngIf="hasPlan && planId && !isEditing">
-      <button class="btn btn-secondary" type="button" (click)="startEditing()">Edit Diet Plan</button>
-    </div>
-
     <fieldset class="diet-editor-fieldset" [disabled]="loading || (hasPlan && !isEditing)">
       <div class="form-grid">
         <div class="field-group">
@@ -72,12 +68,6 @@
 
       <div *ngIf="!hasPlan" class="state-inline">
         This member has no diet plan yet. Add details above and create one.
-      </div>
-
-      <div class="top-actions" *ngIf="!hasPlan">
-        <button class="btn btn-primary" (click)="save()" [disabled]="loading || !title">
-          {{ loading ? 'Creating...' : 'Create Diet Plan' }}
-        </button>
       </div>
 
       <div *ngIf="hasPlan && planId">
@@ -202,23 +192,59 @@
           </div>
         </div>
 
-        <div class="bottom-actions" *ngIf="dietMeals.length > 0">
-          <button type="button" class="btn btn-secondary" (click)="addMeal()">+ Add Meal</button>
-
-          <div class="right-actions">
-            <button type="button" class="btn btn-secondary" (click)="reviewDietPlan()" [disabled]="!canReviewDietPlan || reviewLoading">
-              {{ reviewLoading ? 'Reviewing...' : 'Review Diet Plan' }}
-            </button>
-            <button class="btn btn-primary" (click)="save()" [disabled]="loading">
-              {{ loading ? 'Saving...' : 'Save Diet Plan' }}
-            </button>
-            <button type="button" class="btn btn-danger" (click)="deletePlan()" [disabled]="loading">
-              Delete Diet Plan
-            </button>
-          </div>
-        </div>
       </div>
     </fieldset>
+
+    <div class="bottom-actions plan-footer-actions" *ngIf="!hasPlan">
+      <span></span>
+      <div class="right-actions">
+        <button class="btn btn-primary" (click)="save()" [disabled]="loading || !title">
+          {{ loading ? 'Creating...' : 'Create Diet Plan' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="bottom-actions plan-footer-actions" *ngIf="hasPlan && planId">
+      <button
+        *ngIf="isEditing && dietMeals.length > 0"
+        type="button"
+        class="btn btn-secondary"
+        (click)="addMeal()">
+        + Add Meal
+      </button>
+
+      <span *ngIf="!isEditing || dietMeals.length === 0"></span>
+
+      <div class="right-actions">
+        <button
+          *ngIf="!isEditing"
+          class="btn btn-secondary"
+          type="button"
+          (click)="startEditing()">
+          Edit Diet Plan
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="reviewDietPlan()"
+          [disabled]="!canReviewDietPlan || reviewLoading">
+          {{ reviewLoading ? 'Reviewing...' : 'Review Diet Plan' }}
+        </button>
+
+        <button
+          *ngIf="isEditing"
+          class="btn btn-primary"
+          (click)="save()"
+          [disabled]="loading">
+          {{ loading ? 'Saving...' : 'Save Diet Plan' }}
+        </button>
+
+        <button type="button" class="btn btn-danger" (click)="deletePlan()" [disabled]="loading">
+          Delete Diet Plan
+        </button>
+      </div>
+    </div>
   </section>
 
   <div *ngIf="successMessage" class="success-card">

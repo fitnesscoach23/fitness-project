@@ -42,7 +42,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/checkin/photos/file/**"
+                                "/checkin/photos/file/**",
+                                "/progress/checkins/photos/file/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

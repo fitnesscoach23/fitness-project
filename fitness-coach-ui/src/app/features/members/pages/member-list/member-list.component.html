@@ -34,20 +34,34 @@
         <tr>
           <th>Name</th>
           <th>Email</th>
+          <th>Status</th>
         </tr>
       </thead>
 
       <tbody>
-        <tr *ngFor="let m of members" [routerLink]="['/members', m.id]">
+        <tr
+          *ngFor="let m of members"
+          [routerLink]="['/members', m.id]"
+          [class.inactive-row]="isInactive(m)">
           <td>
             <div class="member-cell">
               <div class="member-name">{{ m.fullName }}</div>
               <div class="member-email-mobile">{{ m.email }}</div>
+              <div class="member-status-mobile">
+                {{ getStatusLabel(m) }} - {{ getInactiveLabel(m) }}
+              </div>
             </div>
           </td>
 
           <td class="member-email-desktop">
             {{ m.email }}
+          </td>
+
+          <td class="member-status-desktop">
+            <span class="member-status-badge" [class.inactive]="isInactive(m)">
+              {{ getStatusLabel(m) }}
+            </span>
+            <span class="member-status-note">{{ getInactiveLabel(m) }}</span>
           </td>
         </tr>
     </tbody>

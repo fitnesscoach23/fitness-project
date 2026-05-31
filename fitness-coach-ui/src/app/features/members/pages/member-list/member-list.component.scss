@@ -98,6 +98,14 @@
   background: rgba(37, 99, 235, 0.04);
 }
 
+.members-table tbody tr.inactive-row {
+  background: rgba(15, 23, 42, 0.025);
+}
+
+.members-table tbody tr.inactive-row:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
 .member-name {
   font-weight: 500;
 }
@@ -120,6 +128,40 @@
   display: none;
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+.member-status-desktop {
+  min-width: 180px;
+}
+
+.member-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 10px;
+}
+
+.member-status-badge.inactive {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+
+.member-status-note {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.member-status-mobile {
+  display: none;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .members-table td:last-child {

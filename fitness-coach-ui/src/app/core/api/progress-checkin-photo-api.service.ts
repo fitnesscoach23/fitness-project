@@ -10,11 +10,15 @@ export class ProgressCheckinPhotoApiService {
   upload(
     checkInId: string,
     type: 'FRONT' | 'SIDE' | 'BACK',
-    file: File
+    file: File,
+    memberName?: string
   ) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);
+    if (memberName) {
+      formData.append('memberName', memberName);
+    }
 
     return this.http.post(
       `${environment.checkinApi}/progress/checkins/photos/${checkInId}`,
@@ -27,5 +31,16 @@ export class ProgressCheckinPhotoApiService {
     return this.http.get<any[]>(
       `${environment.checkinApi}/progress/checkins/photos/${checkInId}`
     );
+  }
+
+  getPhotoUrl(fileName: string): string {
+    return `${environment.checkinApi}/progress/checkins/photos/file/${this.encodePhotoPath(fileName)}`;
+  }
+
+  private encodePhotoPath(fileName: string): string {
+    return String(fileName || '')
+      .split('/')
+      .map(segment => encodeURIComponent(segment))
+      .join('/');
   }
 }
