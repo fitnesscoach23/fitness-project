@@ -2,17 +2,19 @@ import { Component, OnInit } from '@angular/core';
 import { MemberApiService } from '../../../../core/api/member-api.service';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-member-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   templateUrl: './member-list.component.html',
   styleUrls: ['./member-list.component.scss']
 })
 export class MemberListComponent implements OnInit {
 
   members: any[] = [];
+  searchTerm = '';
 
   loading = true;
   error: string | null = null;
@@ -21,6 +23,24 @@ export class MemberListComponent implements OnInit {
 
   ngOnInit() {
     this.loadMembers();
+  }
+
+  get filteredMembers(): any[] {
+    const search = this.searchTerm.trim().toLowerCase();
+
+    if (!search) {
+      return this.members;
+    }
+
+    return this.members.filter((member) => {
+      const fullName = String(member?.fullName || '').toLowerCase();
+      const email = String(member?.email || '').toLowerCase();
+      const status = this.getStatusLabel(member).toLowerCase();
+
+      return fullName.includes(search) ||
+        email.includes(search) ||
+        status.includes(search);
+    });
   }
 
   loadMembers() {
@@ -56,6 +76,14 @@ export class MemberListComponent implements OnInit {
 
   isInactive(member: any): boolean {
     return this.getStatusLabel(member) === 'INACTIVE';
+  }
+
+  getActiveCount(members = this.members): number {
+    return members.filter(member => !this.isInactive(member)).length;
+  }
+
+  getInactiveCount(members = this.members): number {
+    return members.filter(member => this.isInactive(member)).length;
   }
 
   private sortMembers(members: any[]): any[] {

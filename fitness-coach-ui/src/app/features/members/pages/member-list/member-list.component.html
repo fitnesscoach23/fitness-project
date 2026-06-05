@@ -9,8 +9,9 @@
       </p>
     </div>
 
-    <button class="btn-primary" routerLink="/members/create">
-      + Add Member
+    <button class="btn btn-primary" routerLink="/members/create">
+      <span aria-hidden="true">+</span>
+      Add Member
     </button>
   </div>
 
@@ -29,7 +30,38 @@
 
   <!-- Table -->
   <div class="table-card" *ngIf="!loading && !error && members.length > 0">
-    <table class="members-table">
+    <div class="member-search-row">
+      <label class="search-field" for="memberSearch">
+        <span>Search members</span>
+        <input
+          id="memberSearch"
+          type="search"
+          [(ngModel)]="searchTerm"
+          placeholder="Search by name, email, or status"
+          autocomplete="off" />
+      </label>
+    </div>
+
+    <div class="table-toolbar">
+      <div>
+        <strong>{{ filteredMembers.length }}</strong>
+        <span>{{ searchTerm.trim() ? 'Matching members' : 'Total members' }}</span>
+      </div>
+      <div>
+        <strong>{{ getActiveCount(filteredMembers) }}</strong>
+        <span>Active</span>
+      </div>
+      <div>
+        <strong>{{ getInactiveCount(filteredMembers) }}</strong>
+        <span>Inactive</span>
+      </div>
+    </div>
+
+    <div *ngIf="filteredMembers.length === 0" class="state-card empty-search">
+      No members match your search.
+    </div>
+
+    <table class="members-table" *ngIf="filteredMembers.length > 0">
       <thead>
         <tr>
           <th>Name</th>
@@ -40,7 +72,7 @@
 
       <tbody>
         <tr
-          *ngFor="let m of members"
+          *ngFor="let m of filteredMembers"
           [routerLink]="['/members', m.id]"
           [class.inactive-row]="isInactive(m)">
           <td>
