@@ -1,12 +1,17 @@
 .header {
-  min-height: 72px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  min-height: 78px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border-light, #e5e7eb);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  gap: 18px;
+  padding: 12px clamp(18px, 2.8vw, 34px);
+  border-bottom: 1px solid rgba(199, 212, 227, 0.72);
+  box-shadow: 0 10px 34px rgba(15, 23, 42, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .header-left {
@@ -19,21 +24,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 10px;
+  min-height: 30px;
+  padding: 0 11px;
   border-radius: 999px;
-  background: #e8f0ff;
-  color: #1d4ed8;
+  background: var(--primary-soft);
+  color: var(--primary-hover);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .portal-text h1 {
   margin: 0;
-  font-size: 18px;
+  font-size: 19px;
   line-height: 1.1;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-primary, #111827);
 }
 
@@ -43,14 +48,33 @@
   color: var(--text-secondary, #6b7280);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #115e59;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .logout-btn {
   border: 1px solid var(--border-light, #e5e7eb);
   background: #ffffff;
   color: var(--text-primary, #111827);
-  border-radius: 9px;
-  height: 36px;
+  border-radius: 10px;
+  height: 38px;
   padding: 0 14px;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
   transition: all 0.18s ease;
 }
@@ -63,6 +87,7 @@
 @media (max-width: 720px) {
   .header {
     padding: 10px 14px;
+    align-items: flex-start;
   }
 
   .portal-text h1 {
@@ -70,6 +95,10 @@
   }
 
   .portal-text p {
+    display: none;
+  }
+
+  .status-pill {
     display: none;
   }
 }

@@ -104,6 +104,7 @@ loadDietLibraryFoods() {
       this.dietLibraryFoods = [...(res || [])].sort((a, b) =>
         String(a?.foodItem || '').localeCompare(String(b?.foodItem || ''))
       );
+      this.hydrateRowsFromDietLibrary();
       this.loadingDietLibraryFoods = false;
     },
     error: () => {
@@ -350,6 +351,11 @@ onFoodNameInput(row: DietRow) {
 }
 
 onQuantityChanged(row: DietRow) {
+  if (!this.hasLibraryMacroBase(row)) {
+    this.applyLibraryFoodByName(row);
+    return;
+  }
+
   this.applyScaledMacros(row);
 }
 
@@ -364,6 +370,14 @@ applyLibraryFoodByName(row: DietRow) {
   if (!match) return;
   row.dietLibraryFoodId = match.id || null;
   this.applyLibraryFoodToRow(row, match);
+}
+
+private hydrateRowsFromDietLibrary() {
+  for (const row of this.allDietRows) {
+    if (!this.hasLibraryMacroBase(row)) {
+      this.applyLibraryFoodByName(row);
+    }
+  }
 }
 
 private applyLibraryFoodToRow(row: DietRow, selected: any) {
@@ -453,6 +467,17 @@ private applyScaledMacros(row: DietRow) {
   row.carbs = round(row.libraryBaseCarbs);
   row.protein = round(row.libraryBaseProtein);
   row.fat = round(row.libraryBaseFat);
+}
+
+private hasLibraryMacroBase(row: DietRow): boolean {
+  return row.libraryBaseQuantity != null
+    && row.libraryBaseQuantity > 0
+    && (
+      row.libraryBaseCalories != null
+      || row.libraryBaseCarbs != null
+      || row.libraryBaseProtein != null
+      || row.libraryBaseFat != null
+    );
 }
 
 private parseServingFromFoodName(foodName: string): { quantity: number; unit: string } {
@@ -563,6 +588,7 @@ onMemberChange() {
       this.title = plan?.title || '';
       this.notes = plan?.notes || '';
       this.dietMeals = this.hasPlan ? this.mapPlanToMeals(plan) : [];
+      this.hydrateRowsFromDietLibrary();
       this.applyStoredMealOrder();
       this.isEditing = !this.hasPlan;
     },

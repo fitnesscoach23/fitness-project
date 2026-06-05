@@ -711,6 +711,7 @@
                 [src]="getCheckinPhotoUrl(currentFront)"
                 crossorigin="anonymous"
                 class="comparison-photo"
+                [style.filter]="comparisonPhotoFilter"
               />
               <ng-template #noCurrentFront>
                 <div class="comparison-photo-empty">No current front photo</div>
@@ -739,6 +740,7 @@
                 [src]="getCheckinPhotoUrl(currentSide)"
                 crossorigin="anonymous"
                 class="comparison-photo"
+                [style.filter]="comparisonPhotoFilter"
               />
               <ng-template #noCurrentSide>
                 <div class="comparison-photo-empty">No current side photo</div>
@@ -767,6 +769,7 @@
                 [src]="getCheckinPhotoUrl(currentBack)"
                 crossorigin="anonymous"
                 class="comparison-photo"
+                [style.filter]="comparisonPhotoFilter"
               />
               <ng-template #noCurrentBack>
                 <div class="comparison-photo-empty">No current back photo</div>
@@ -786,6 +789,80 @@
               <div class="comparison-photo-caption">Previous</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div class="comparison-enhancement-panel">
+        <div class="comparison-enhancement-heading">
+          <span>Most Recent Photo Optimizer</span>
+          <button type="button" class="secondary-btn" (click)="resetComparisonEnhancement()">Reset</button>
+        </div>
+
+        <div class="comparison-preset-controls" role="group" aria-label="Photo enhancement presets">
+          <button
+            type="button"
+            class="secondary-btn"
+            [class.active]="comparisonEnhancementPreset === 'natural'"
+            (click)="applyComparisonEnhancementPreset('natural')">
+            Natural
+          </button>
+          <button
+            type="button"
+            class="secondary-btn"
+            [class.active]="comparisonEnhancementPreset === 'sharp'"
+            (click)="applyComparisonEnhancementPreset('sharp')">
+            Sharp
+          </button>
+          <button
+            type="button"
+            class="secondary-btn"
+            [class.active]="comparisonEnhancementPreset === 'defined'"
+            (click)="applyComparisonEnhancementPreset('defined')">
+            Defined
+          </button>
+        </div>
+
+        <div class="comparison-slider-grid">
+          <label>
+            <span>Contrast {{ comparisonEnhancement.contrast }}%</span>
+            <input
+              type="range"
+              min="85"
+              max="140"
+              step="1"
+              [(ngModel)]="comparisonEnhancement.contrast"
+              (ngModelChange)="onComparisonEnhancementChanged()" />
+          </label>
+          <label>
+            <span>Brightness {{ comparisonEnhancement.brightness }}%</span>
+            <input
+              type="range"
+              min="85"
+              max="120"
+              step="1"
+              [(ngModel)]="comparisonEnhancement.brightness"
+              (ngModelChange)="onComparisonEnhancementChanged()" />
+          </label>
+          <label>
+            <span>Saturation {{ comparisonEnhancement.saturate }}%</span>
+            <input
+              type="range"
+              min="85"
+              max="135"
+              step="1"
+              [(ngModel)]="comparisonEnhancement.saturate"
+              (ngModelChange)="onComparisonEnhancementChanged()" />
+          </label>
+          <label>
+            <span>Clarity {{ comparisonEnhancement.clarity }}</span>
+            <input
+              type="range"
+              min="0"
+              max="20"
+              step="1"
+              [(ngModel)]="comparisonEnhancement.clarity"
+              (ngModelChange)="onComparisonEnhancementChanged()" />
+          </label>
         </div>
       </div>
     </div>
@@ -819,7 +896,7 @@
     No additional notes.
   </p>
 
-  <div *ngFor="let day of activeWorkoutPlan.days" class="day-card">
+  <div *ngFor="let day of activeWorkoutPlan.days; trackBy: trackByWorkoutDay" class="day-card">
 
     <h4 class="day-title">{{ day.dayName }}</h4>
 
@@ -832,15 +909,15 @@
     </div>
 
     <!-- Exercise Rows -->
-    <div *ngFor="let ex of day.exercises">
+    <div *ngFor="let ex of day.exercises; trackBy: trackByWorkoutExercise">
 
-      <div *ngFor="let s of ex.sets" class="workout-row">
+      <div *ngFor="let s of ex.sets; trackBy: trackByWorkoutSet" class="workout-row">
         <div class="exercise-col">{{ ex.name }}</div>
         <div>{{ s.setNumber }}</div>
         <div>{{ s.reps }}</div>
         <div>
           <a
-            *ngIf="getWorkoutVideoUrl(ex) as videoUrl; else noWorkoutVideo"
+            *ngIf="ex.displayVideoUrl as videoUrl; else noWorkoutVideo"
             [href]="videoUrl"
             target="_blank"
             rel="noopener noreferrer">
@@ -874,7 +951,7 @@
 
     <h4 class="plan-title">{{ dietPlan.title }}</h4>
 
-    <div *ngFor="let meal of groupedDietMeals" class="meal-card">
+    <div *ngFor="let meal of groupedDietMeals; trackBy: trackByDietMeal" class="meal-card">
 
       <h5 class="meal-title">{{ meal.mealName }}</h5>
 
@@ -889,13 +966,13 @@
       </div>
 
       <!-- Food Rows -->
-      <div *ngFor="let i of meal.items" class="diet-row">
+      <div *ngFor="let i of meal.items; trackBy: trackByDietItem" class="diet-row">
         <div class="food-name">
-          <div>{{ getDietItemDisplayName(i.foodName) }}</div>
+          <div>{{ i.displayFoodName }}</div>
           <div
-            *ngIf="getDietItemOptionalAlternatives(i.foodName).length"
+            *ngIf="i.optionalAlternatives.length"
             class="diet-optional-text">
-            Optional: {{ getDietItemOptionalAlternatives(i.foodName).join(', ') }}
+            Optional: {{ i.optionalAlternatives.join(', ') }}
           </div>
         </div>
         <div>{{ i.quantity }}</div>

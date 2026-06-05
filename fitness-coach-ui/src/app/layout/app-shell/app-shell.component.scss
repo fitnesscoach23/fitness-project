@@ -1,16 +1,35 @@
 .shell {
   display: flex;
   height: 100vh;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent 34%),
+    linear-gradient(315deg, rgba(15, 118, 110, 0.08), transparent 30%),
+    var(--bg-app);
 }
 
 .main {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .content {
-  padding: 20px;
-  background: #f4f6f9;
+  padding: clamp(18px, 2.8vw, 34px);
   flex: 1;
+  overflow: auto;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .content {
+    overflow: visible;
+  }
 }

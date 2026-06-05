@@ -1,13 +1,25 @@
 <div class="sidebar">
-  <h2>Fitness Coach APP</h2>
+  <div class="brand">
+    <div class="brand-mark">FC</div>
+    <div>
+      <h2>Fitness Coach</h2>
+      <p>Coach Workspace</p>
+    </div>
+  </div>
 
-  <a routerLink="/dashboard">Dashboard</a>
-  <a routerLink="/members">Members</a>
-  <a routerLink="/plans/workouts/create">Workout Plan</a>
-  <a routerLink="/exercise-library">Exercise Library</a>
-  <a routerLink="/diet-library">Diet Library</a>
-  <a routerLink="/notifications">Notifications</a>
-  <a routerLink="/plans/diets/create">Diet Plan</a>
-  <a routerLink="/billing">Billing</a>
-  <a routerLink="/checkins/create">Checkin</a>
+  <nav class="nav-list" aria-label="Primary navigation">
+    <a
+      *ngFor="let item of navItems"
+      [routerLink]="item.route"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }">
+      <span class="nav-icon">{{ item.icon }}</span>
+      <span>{{ item.label }}</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-foot">
+    <span>Live Coaching OS</span>
+    <strong>Premium</strong>
+  </div>
 </div>

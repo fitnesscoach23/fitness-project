@@ -1,24 +1,44 @@
 :root {
-  /* Backgrounds */
-  --bg-app: #F5F7FA;
-  --bg-card: #FFFFFF;
+  color-scheme: light;
 
-  /* Borders */
-  --border-light: #E5E7EB;
+  /* Backgrounds */
+  --bg-app: #eef3f8;
+  --bg-app-deep: #dfe8f1;
+  --bg-card: #ffffff;
+  --bg-card-soft: #f8fafc;
+  --bg-elevated: rgba(255, 255, 255, 0.88);
+  --bg-inverse: #0d1b2a;
 
   /* Text */
-  --text-primary: #111827;
-  --text-secondary: #6B7280;
-  --text-muted: #9CA3AF;
+  --text-primary: #102033;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-inverse: #f8fafc;
+
+  /* Borders */
+  --border-light: #dce5ef;
+  --border-strong: #c7d4e3;
 
   /* Brand */
-  --primary: #2563EB;
-  --primary-hover: #1D4ED8;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-soft: #dbeafe;
+  --accent: #0f766e;
+  --accent-soft: #ccfbf1;
+  --gold: #b7791f;
+  --gold-soft: #fef3c7;
 
   /* Status */
-  --success: #16A34A;
-  --warning: #F59E0B;
-  --danger: #DC2626;
+  --success: #15803d;
+  --warning: #d97706;
+  --danger: #dc2626;
 
-  
+  /* Shape and elevation */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 8px 22px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 18px 45px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 26px 80px rgba(15, 23, 42, 0.16);
+  --focus-ring: 0 0 0 4px rgba(37, 99, 235, 0.18);
 }

@@ -39,6 +39,17 @@ type BodyMetricSourceField =
   | 'fatsGrams'
   | 'auto';
 
+type ComparisonEnhancementPreset = 'natural' | 'sharp' | 'defined' | 'custom';
+type DietPlanTotals = { calories: number | null; protein: number | null; carbs: number | null; fats: number | null };
+type DietItemViewModel = any & {
+  displayFoodName: string;
+  optionalAlternatives: string[];
+};
+type DietMealViewModel = {
+  mealName: string;
+  items: DietItemViewModel[];
+};
+
 @Component({
   selector: 'app-member-profile',
   standalone: true,
@@ -85,6 +96,9 @@ export class MemberProfileComponent implements OnInit {
   pastWorkoutPlans: any[] = [];
   dietPlan: any = null;
   dietLoading = true;
+  groupedDietMeals: DietMealViewModel[] = [];
+  private dietPlanTotals: DietPlanTotals = { calories: null, protein: null, carbs: null, fats: null };
+  private currentDietPlanSummaryText = 'NA';
   progressCheckins: any[] = [];
   progressCheckinsLoading = true;
   checkinPhotos: { [checkinId: string]: any[] } = {};
@@ -95,6 +109,13 @@ export class MemberProfileComponent implements OnInit {
   isProgressComparisonMaximized = false;
   comparisonZoomLevel = 1;
   capturingComparison = false;
+  comparisonEnhancementPreset: ComparisonEnhancementPreset = 'sharp';
+  comparisonEnhancement = {
+    contrast: 112,
+    brightness: 103,
+    saturate: 106,
+    clarity: 8
+  };
   activeSection: 'overview' | 'bodyMetrics' | 'billing' | 'progress' | 'dailyConsistency' | 'workout' | 'diet' = 'overview';
   totalPaid = 0;
   totalPending = 0;
@@ -261,14 +282,21 @@ export class MemberProfileComponent implements OnInit {
     }
   ];
 
-  get groupedDietMeals(): Array<{ mealName: string; items: any[] }> {
+  private buildGroupedDietMeals(): DietMealViewModel[] {
     const meals = this.dietPlan?.meals || [];
-    const grouped = new Map<string, any[]>();
+    const grouped = new Map<string, DietItemViewModel[]>();
 
     for (const meal of meals) {
       const mealName = (meal?.mealName || meal?.name || 'Other').trim();
       const key = mealName || 'Other';
-      const items = meal?.items || [];
+      const items = (meal?.items || []).map((item: any) => {
+        const parsed = this.parseDietItemFoodName(item?.foodName);
+        return {
+          ...item,
+          displayFoodName: parsed.primaryFoodName,
+          optionalAlternatives: parsed.optionalAlternatives
+        };
+      });
 
       if (!grouped.has(key)) {
         grouped.set(key, []);
@@ -283,6 +311,12 @@ export class MemberProfileComponent implements OnInit {
     }));
   }
 
+  private refreshDietPlanViewModel(): void {
+    this.groupedDietMeals = this.buildGroupedDietMeals();
+    this.dietPlanTotals = this.calculateDietPlanTotals();
+    this.currentDietPlanSummaryText = this.buildCurrentDietPlanSummary();
+  }
+
   getDietItemDisplayName(foodName: any): string {
     return this.parseDietItemFoodName(foodName).primaryFoodName;
   }
@@ -291,7 +325,7 @@ export class MemberProfileComponent implements OnInit {
     return this.parseDietItemFoodName(foodName).optionalAlternatives;
   }
 
-  private getDietPlanTotals(): { calories: number | null; protein: number | null; carbs: number | null; fats: number | null } {
+  private calculateDietPlanTotals(): DietPlanTotals {
     const items = this.groupedDietMeals.flatMap((meal) => meal.items || []);
     let calories = 0;
     let protein = 0;
@@ -1425,6 +1459,7 @@ loadWorkout() {
         this.activeWorkoutPlan = res;
         this.pastWorkoutPlans = [];
       }
+      this.activeWorkoutPlan = this.buildWorkoutPlanViewModel(this.activeWorkoutPlan);
 
       this.workoutLoading = false;
     },
@@ -1486,10 +1521,12 @@ loadDiet() {
   this.dietApi.getDietPlanByMember(this.member.id).subscribe({
     next: res => {
       this.dietPlan = res;
+      this.refreshDietPlanViewModel();
       this.dietLoading = false;
     },
     error: () => {
       this.dietPlan = null;
+      this.refreshDietPlanViewModel();
       this.dietLoading = false;
     }
   });
@@ -1625,6 +1662,22 @@ getWorkoutVideoUrl(exercise: any): string | null {
   return `https://${raw}`;
 }
 
+private buildWorkoutPlanViewModel(plan: any): any {
+  if (!plan) return null;
+
+  return {
+    ...plan,
+    days: (plan.days || []).map((day: any) => ({
+      ...day,
+      exercises: (day.exercises || []).map((exercise: any) => ({
+        ...exercise,
+        displayVideoUrl: this.getWorkoutVideoUrl(exercise),
+        sets: exercise?.sets || []
+      }))
+    }))
+  };
+}
+
 exportDietPlanToExcel() {
   if (!this.dietPlan) {
     alert('No diet plan found to export.');
@@ -1649,7 +1702,7 @@ exportDietPlanToExcel() {
     mealGroup.items?.forEach((item: any, itemIndex: number) => {
       rows.push([
         itemIndex === 0 ? mealGroup.mealName : '',
-        this.getDietItemDisplayName(item.foodName),
+        item.displayFoodName || this.getDietItemDisplayName(item.foodName),
         item.quantity ?? '',
         item.unit || '',
         item.calories ?? ''
@@ -1801,6 +1854,7 @@ openProgressComparison() {
   this.showProgressComparisonModal = true;
   this.isProgressComparisonMaximized = false;
   this.comparisonZoomLevel = 1;
+  this.applyComparisonEnhancementPreset(this.comparisonEnhancementPreset);
 }
 
 closeProgressComparison() {
@@ -1839,6 +1893,39 @@ zoomOutComparison() {
 
 resetComparisonZoom() {
   this.comparisonZoomLevel = 1;
+}
+
+applyComparisonEnhancementPreset(preset: ComparisonEnhancementPreset) {
+  this.comparisonEnhancementPreset = preset;
+
+  const presets: Record<ComparisonEnhancementPreset, typeof this.comparisonEnhancement> = {
+    natural: { contrast: 100, brightness: 100, saturate: 100, clarity: 0 },
+    sharp: { contrast: 112, brightness: 103, saturate: 106, clarity: 8 },
+    defined: { contrast: 122, brightness: 101, saturate: 110, clarity: 14 },
+    custom: this.comparisonEnhancement
+  };
+
+  this.comparisonEnhancement = { ...presets[preset] };
+}
+
+onComparisonEnhancementChanged() {
+  this.comparisonEnhancementPreset = 'custom';
+}
+
+resetComparisonEnhancement() {
+  this.applyComparisonEnhancementPreset('sharp');
+}
+
+get comparisonPhotoFilter(): string {
+  const { contrast, brightness, saturate, clarity } = this.comparisonEnhancement;
+  const shadowStrength = this.roundTo(clarity / 100, 2);
+
+  return [
+    `contrast(${contrast}%)`,
+    `brightness(${brightness}%)`,
+    `saturate(${saturate}%)`,
+    clarity > 0 ? `drop-shadow(0 0 ${clarity / 2}px rgba(15, 23, 42, ${shadowStrength}))` : ''
+  ].filter(Boolean).join(' ');
 }
 
 async captureProgressComparison() {
@@ -1888,7 +1975,11 @@ get canCompareProgress(): boolean {
 }
 
 get currentDietPlanSummary(): string {
-  const totals = this.getDietPlanTotals();
+  return this.currentDietPlanSummaryText;
+}
+
+private buildCurrentDietPlanSummary(): string {
+  const totals = this.dietPlanTotals;
   const calories = totals.calories;
   const carbs = totals.carbs;
   const protein = totals.protein;
@@ -1909,6 +2000,26 @@ get currentDietPlanSummary(): string {
   }
 
   return 'NA';
+}
+
+trackByWorkoutDay(_index: number, day: any): any {
+  return day?.id || day?.dayName || _index;
+}
+
+trackByWorkoutExercise(_index: number, exercise: any): any {
+  return exercise?.id || `${exercise?.name || ''}-${exercise?.videoUrl || ''}-${_index}`;
+}
+
+trackByWorkoutSet(_index: number, set: any): any {
+  return set?.id || set?.setNumber || _index;
+}
+
+trackByDietMeal(_index: number, meal: DietMealViewModel): string {
+  return meal.mealName;
+}
+
+trackByDietItem(_index: number, item: DietItemViewModel): any {
+  return item?.id || `${item?.displayFoodName || item?.foodName || ''}-${item?.quantity || ''}-${_index}`;
 }
 
 getComparisonValue(checkin: any, field: 'weight' | 'stepsAvg' | 'dietAdherence' | 'energy' | 'exerciseRating'): string {
