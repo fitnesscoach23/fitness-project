@@ -74,11 +74,72 @@
 }
 
 .calendar-card,
-.editor-card {
+.editor-card,
+.bulk-update-card {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #ffffff;
   padding: 18px;
+}
+
+.bulk-update-card {
+  display: grid;
+  gap: 14px;
+}
+
+.bulk-update-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.bulk-update-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #111827;
+}
+
+.bulk-update-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.bulk-count {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bulk-update-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bulk-date-shortcuts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-message {
+  color: #166534;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .calendar-status {
@@ -272,6 +333,7 @@
 }
 
 .editor-field input,
+.editor-field select,
 .editor-field textarea {
   width: 100%;
   border: 1px solid #d1d5db;
@@ -282,6 +344,12 @@
 
 .editor-field textarea {
   resize: vertical;
+}
+
+.editor-field input:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 .editor-actions {
@@ -336,6 +404,16 @@
   }
 
   .calendar-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-update-header,
+  .bulk-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bulk-update-grid {
     grid-template-columns: 1fr;
   }
 

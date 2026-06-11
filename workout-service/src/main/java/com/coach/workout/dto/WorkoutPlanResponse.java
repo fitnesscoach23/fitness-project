@@ -9,6 +9,7 @@ public record WorkoutPlanResponse(
         UUID memberId,
         String title,
         String notes,
+        Integer targetStepsCount,
         Instant createdAt,
         List<Day> days
 ) {

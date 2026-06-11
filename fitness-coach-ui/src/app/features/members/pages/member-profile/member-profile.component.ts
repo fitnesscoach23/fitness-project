@@ -8,11 +8,16 @@ import { CheckinApiService } from '../../../../core/services/checkin-api.service
 import { FormArray, FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { environment } from '../../../../../environments/environment';
 import { Chart, registerables } from 'chart.js';
+import { forkJoin } from 'rxjs';
 import { WorkoutApiService } from '../../../../core/services/workout-api.service';
 import { DietApiService } from '../../../../core/services/diet-api.service';
 import { ProgressCheckinApiService } from '../../../../core/services/progress-checkin-api.service';
 import { ProgressCheckinPhotoApiService } from '../../../../core/api/progress-checkin-photo-api.service';
 import { DailyCheckinCalendarComponent } from '../../components/daily-checkin-calendar/daily-checkin-calendar.component';
+import {
+  DailyCheckinApiService,
+  DailyCheckinDay
+} from '../../../../core/services/daily-checkin-api.service';
 
 declare const XLSX: any;
 
@@ -49,6 +54,19 @@ type DietMealViewModel = {
   mealName: string;
   items: DietItemViewModel[];
 };
+export type WeeklyConsistencyTrend = 'improving' | 'declining' | 'stable';
+type WeeklyConsistencyScore = {
+  label: string;
+  rangeLabel: string;
+  completedWorkouts: number;
+  plannedWorkouts: number;
+  averageDailySteps: number;
+  stepTarget: number;
+  workoutCompliance: number;
+  stepsCompliance: number;
+  score: number;
+  rating: string;
+};
 
 @Component({
   selector: 'app-member-profile',
@@ -61,6 +79,7 @@ export class MemberProfileComponent implements OnInit {
   private readonly expirySoonDays = 7;
   @ViewChild('comparisonModal') comparisonModalRef?: ElementRef<HTMLDivElement>;
   @ViewChild('comparisonCapture') comparisonCaptureRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('weeklyReportCapture') weeklyReportCaptureRef?: ElementRef<HTMLDivElement>;
 
   member: any = null;
   loading = true;
@@ -94,6 +113,13 @@ export class MemberProfileComponent implements OnInit {
   selectedWorkoutPlanId: string | null = null;
   activeWorkoutPlan: any = null;
   pastWorkoutPlans: any[] = [];
+  weeklyConsistencyLoading = false;
+  weeklyConsistencyError: string | null = null;
+  currentWeekConsistency: WeeklyConsistencyScore | null = null;
+  previousWeekConsistency: WeeklyConsistencyScore | null = null;
+  weeklyConsistencyTrend: WeeklyConsistencyTrend = 'stable';
+  weeklyManualFeedback = '';
+  capturingWeeklyReport = false;
   dietPlan: any = null;
   dietLoading = true;
   groupedDietMeals: DietMealViewModel[] = [];
@@ -837,6 +863,7 @@ export class MemberProfileComponent implements OnInit {
     private workoutApi: WorkoutApiService,
     private router: Router,
     private dietApi: DietApiService,
+    private dailyCheckinApi: DailyCheckinApiService,
     private progressCheckinApi: ProgressCheckinApiService,
     private photoApi : ProgressCheckinPhotoApiService
   ) {
@@ -1462,13 +1489,198 @@ loadWorkout() {
       this.activeWorkoutPlan = this.buildWorkoutPlanViewModel(this.activeWorkoutPlan);
 
       this.workoutLoading = false;
+      this.loadWeeklyConsistency();
     },
     error: () => {
       this.activeWorkoutPlan = null;
       this.pastWorkoutPlans = [];
+      this.currentWeekConsistency = null;
+      this.previousWeekConsistency = null;
       this.workoutLoading = false;
     }
   });
+}
+
+loadWeeklyConsistency() {
+  if (!this.member?.id) return;
+
+  const today = this.startOfDay(new Date());
+  const currentWeekStart = this.getWeekStart(today);
+  const previousWeekStart = this.addDays(currentWeekStart, -7);
+  const previousWeekEnd = this.addDays(currentWeekStart, -1);
+  const ranges = [
+    { start: currentWeekStart, end: today },
+    { start: previousWeekStart, end: previousWeekEnd }
+  ];
+  const monthKeys = Array.from(new Set(
+    ranges.flatMap((range) => this.getMonthKeysBetween(range.start, range.end))
+  ));
+
+  this.weeklyConsistencyLoading = true;
+  this.weeklyConsistencyError = null;
+
+  forkJoin(monthKeys.map((month) => this.dailyCheckinApi.getMemberCalendar(this.member.id, month)))
+    .subscribe({
+      next: (calendars) => {
+        const days = calendars.flatMap((calendar) => calendar.days || []);
+        this.currentWeekConsistency = this.buildWeeklyConsistencyScore(
+          'Current week',
+          currentWeekStart,
+          today,
+          days
+        );
+        this.previousWeekConsistency = this.buildWeeklyConsistencyScore(
+          'Previous week',
+          previousWeekStart,
+          previousWeekEnd,
+          days
+        );
+        this.weeklyConsistencyTrend = this.getWeeklyConsistencyTrend(
+          this.currentWeekConsistency?.score,
+          this.previousWeekConsistency?.score
+        );
+        this.weeklyConsistencyLoading = false;
+      },
+      error: () => {
+        this.currentWeekConsistency = null;
+        this.previousWeekConsistency = null;
+        this.weeklyConsistencyLoading = false;
+        this.weeklyConsistencyError = 'Failed to load weekly consistency';
+      }
+    });
+}
+
+private buildWeeklyConsistencyScore(
+  label: string,
+  start: Date,
+  end: Date,
+  days: DailyCheckinDay[]
+): WeeklyConsistencyScore {
+  const dateKeys = this.getDateKeysBetween(start, end);
+  const entriesByDate = new Map(days.map((day) => [day.checkInDate, day]));
+  const weekEntries = dateKeys.map((date) => entriesByDate.get(date) || null);
+  const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
+  const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
+  const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
+  const plannedWorkouts = this.getPlannedWorkoutsPerWeek();
+  const stepTarget = Math.max(0, Number(this.activeWorkoutPlan?.targetStepsCount || 0));
+  const workoutCompliance = plannedWorkouts > 0
+    ? Math.min(100, (completedWorkouts / plannedWorkouts) * 100)
+    : 0;
+  const stepsCompliance = stepTarget > 0
+    ? Math.min(100, (averageDailySteps / stepTarget) * 100)
+    : 0;
+  const score = (workoutCompliance * 0.7) + (stepsCompliance * 0.3);
+
+  return {
+    label,
+    rangeLabel: `${this.formatShortDate(start)} - ${this.formatShortDate(end)}`,
+    completedWorkouts,
+    plannedWorkouts,
+    averageDailySteps: this.roundTo(averageDailySteps, 0),
+    stepTarget,
+    workoutCompliance: this.roundTo(workoutCompliance, 1),
+    stepsCompliance: this.roundTo(stepsCompliance, 1),
+    score: this.roundTo(score, 0),
+    rating: this.getConsistencyRating(score)
+  };
+}
+
+private getPlannedWorkoutsPerWeek(): number {
+  return Array.isArray(this.activeWorkoutPlan?.days) ? this.activeWorkoutPlan.days.length : 0;
+}
+
+private getConsistencyRating(score: number): string {
+  if (score >= 90) return 'Excellent';
+  if (score >= 80) return 'Good';
+  if (score >= 70) return 'Decent';
+  if (score >= 60) return 'Below Target';
+  return 'Needs Improvement';
+}
+
+getWeeklyConsistencyTrendLabel(): string {
+  if (this.weeklyConsistencyTrend === 'improving') return 'Improving';
+  if (this.weeklyConsistencyTrend === 'declining') return 'Declining';
+  return 'Stable';
+}
+
+getWeeklyConsistencyTrendSymbol(): string {
+  if (this.weeklyConsistencyTrend === 'improving') return '↑';
+  if (this.weeklyConsistencyTrend === 'declining') return '↓';
+  return '→';
+}
+
+private getWeeklyConsistencyTrend(
+  currentScore: number | null | undefined,
+  previousScore: number | null | undefined
+): WeeklyConsistencyTrend {
+  if (currentScore == null || previousScore == null) return 'stable';
+  const difference = currentScore - previousScore;
+  if (difference >= 5) return 'improving';
+  if (difference <= -5) return 'declining';
+  return 'stable';
+}
+
+private getWeekStart(value: Date): Date {
+  const date = this.startOfDay(value);
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return this.addDays(date, mondayOffset);
+}
+
+private startOfDay(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+private addDays(value: Date, days: number): Date {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+private getMonthKeysBetween(start: Date, end: Date): string[] {
+  const keys: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+
+  while (cursor <= last) {
+    keys.push(this.getMonthKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return keys;
+}
+
+private getDateKeysBetween(start: Date, end: Date): string[] {
+  const keys: string[] = [];
+  let cursor = this.startOfDay(start);
+  const last = this.startOfDay(end);
+
+  while (cursor <= last) {
+    keys.push(this.getDateKey(cursor));
+    cursor = this.addDays(cursor, 1);
+  }
+
+  return keys;
+}
+
+private getMonthKey(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+private getDateKey(value: Date): string {
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${value.getFullYear()}-${month}-${day}`;
+}
+
+private formatShortDate(value: Date): string {
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short'
+  }).format(value);
 }
 
 
@@ -1558,6 +1770,7 @@ exportWorkoutPlanToExcel() {
   const videoCells: Array<{ rowIndex: number; colIndex: number; url: string }> = [];
   const rows: any[][] = [
     [`Exercise Plan for ${this.member?.fullName || 'Member'} (${dateLabel})`],
+    [`Target Steps: ${this.activeWorkoutPlan?.targetStepsCount != null ? this.activeWorkoutPlan.targetStepsCount : '-'}`],
     [`Notes: ${this.activeWorkoutPlan?.notes?.trim() || '-'}`],
     ['Daily 10 mins General Warmup + 1-2 light sets of first exercise'],
     ['Section', 'Exercise', 'Sets', 'Reps', 'Video']
@@ -1965,6 +2178,39 @@ async captureProgressComparison() {
   }
 }
 
+async captureWeeklyReport() {
+  const captureElement = this.weeklyReportCaptureRef?.nativeElement;
+  if (!captureElement || this.capturingWeeklyReport || !this.currentWeekConsistency) return;
+
+  this.capturingWeeklyReport = true;
+  this.cdr.detectChanges();
+
+  try {
+    const html2canvas = (await import('html2canvas')).default;
+
+    const canvas = await html2canvas(captureElement, {
+      backgroundColor: '#ffffff',
+      scale: Math.min(window.devicePixelRatio || 1, 2),
+      useCORS: true,
+      allowTaint: false,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: captureElement.scrollWidth,
+      windowHeight: captureElement.scrollHeight
+    });
+
+    const link = document.createElement('a');
+    link.download = this.getWeeklyReportFileName();
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch {
+    alert('Unable to export weekly report image. Please try again.');
+  } finally {
+    this.capturingWeeklyReport = false;
+    this.cdr.detectChanges();
+  }
+}
+
 @HostListener('document:fullscreenchange')
 onFullscreenChange() {
   this.isProgressComparisonMaximized = !!document.fullscreenElement;
@@ -2133,6 +2379,21 @@ private getProgressComparisonFileName(): string {
   const previousDate = this.formatProgressCheckinDate(this.previousCheckin?.submittedAt).replace(/\s+/g, '-');
 
   return `Progress-Comparison-${memberName}-${currentDate}-vs-${previousDate}.png`;
+}
+
+private getWeeklyReportFileName(): string {
+  const memberName = String(this.member?.fullName || 'Member')
+    .replace(/[<>:"/\\|?*\x00-\x1F\x7F]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'Member';
+  const rangeLabel = String(this.currentWeekConsistency?.rangeLabel || 'Current-Week')
+    .replace(/[<>:"/\\|?*\x00-\x1F\x7F]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'Current-Week';
+
+  return `Weekly-Consistency-${memberName}-${rangeLabel}.png`;
 }
 
 private initializeConfirmPaymentDates(): void {

@@ -40,6 +40,7 @@ updateWorkoutPlan(
   payload: {
     title: string;
     notes?: string;
+    targetStepsCount?: number | null;
   }
 ) {
   return this.http.put(

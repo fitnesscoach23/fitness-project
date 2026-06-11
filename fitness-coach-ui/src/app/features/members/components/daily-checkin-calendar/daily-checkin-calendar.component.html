@@ -35,6 +35,77 @@
     </div>
   </div>
 
+  <div class="bulk-update-card">
+    <div class="bulk-update-header">
+      <div>
+        <h4>Bulk Update Records</h4>
+        <p>Select a date range and mark daily records as active or inactive.</p>
+      </div>
+      <div class="bulk-count">{{ bulkSelectedDaysCount }} days selected</div>
+    </div>
+
+    <div class="bulk-update-grid">
+      <div class="editor-field">
+        <label>Start Date</label>
+        <input type="date" [(ngModel)]="bulkEditor.startDate" />
+      </div>
+
+      <div class="editor-field">
+        <label>End Date</label>
+        <input type="date" [(ngModel)]="bulkEditor.endDate" />
+      </div>
+
+      <div class="editor-field">
+        <label>Status</label>
+        <select [(ngModel)]="bulkEditor.status">
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+        </select>
+      </div>
+
+      <div class="editor-field">
+        <label>Steps Count</label>
+        <input
+          type="number"
+          min="0"
+          [(ngModel)]="bulkEditor.stepsCount"
+          [disabled]="bulkEditor.status === 'INACTIVE'"
+          placeholder="Keep existing or 0" />
+      </div>
+    </div>
+
+    <div class="editor-field">
+      <label>Notes</label>
+      <textarea
+        rows="2"
+        [(ngModel)]="bulkEditor.notes"
+        placeholder="Optional note to apply to all selected days"></textarea>
+    </div>
+
+    <div class="bulk-actions">
+      <div class="bulk-date-shortcuts" *ngIf="editor">
+        <button type="button" class="secondary-btn" (click)="useSelectedDateAsBulkStart()">
+          Set selected as start
+        </button>
+        <button type="button" class="secondary-btn" (click)="useSelectedDateAsBulkEnd()">
+          Set selected as end
+        </button>
+      </div>
+
+      <button
+        type="button"
+        class="primary-btn"
+        [disabled]="bulkSaving || bulkSelectedDaysCount === 0"
+        (click)="applyBulkUpdate()">
+        {{ bulkSaving ? 'Updating...' : 'Update Selected Range' }}
+      </button>
+    </div>
+
+    <div class="bulk-message" *ngIf="bulkMessage">
+      {{ bulkMessage }}
+    </div>
+  </div>
+
   <div class="calendar-shell">
     <div class="calendar-card">
       <div class="calendar-status" *ngIf="loading">Loading daily check-ins...</div>

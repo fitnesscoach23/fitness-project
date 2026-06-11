@@ -30,6 +30,7 @@ public class WorkoutService {
                 .coachEmail(coachEmail)
                 .title(req.title())
                 .notes(req.notes())
+                .targetStepsCount(req.targetStepsCount())
                 .createdAt(Instant.now())
                 .build();
         planRepo.save(plan);
@@ -140,6 +141,7 @@ public class WorkoutService {
                 plan.getMemberId(),
                 plan.getTitle(),
                 plan.getNotes(),
+                plan.getTargetStepsCount(),
                 plan.getCreatedAt(),
                 dayResponses
         );
@@ -150,6 +152,7 @@ public class WorkoutService {
         WorkoutPlan plan = assertOwnedPlan(coachEmail, planId);
         plan.setTitle(req.title());
         plan.setNotes(req.notes());
+        plan.setTargetStepsCount(req.targetStepsCount());
         planRepo.save(plan);
     }
 

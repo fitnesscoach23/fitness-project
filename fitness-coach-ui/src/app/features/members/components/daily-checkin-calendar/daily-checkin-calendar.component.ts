@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import {
   DailyCheckinApiService,
   DailyCheckinCalendar,
@@ -22,6 +23,16 @@ interface DailyCheckinEditor {
   notes: string;
 }
 
+type BulkStatus = 'ACTIVE' | 'INACTIVE';
+
+interface BulkDailyCheckinEditor {
+  startDate: string;
+  endDate: string;
+  status: BulkStatus;
+  stepsCount: number | null;
+  notes: string;
+}
+
 @Component({
   selector: 'app-daily-checkin-calendar',
   standalone: true,
@@ -31,6 +42,7 @@ interface DailyCheckinEditor {
 })
 export class DailyCheckinCalendarComponent implements OnChanges {
   @Input({ required: true }) memberId = '';
+  @Output() checkinsChanged = new EventEmitter<void>();
 
   readonly weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   readonly emptySummary: DailyCheckinSummary = {
@@ -49,7 +61,10 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   loading = false;
   saving = false;
   deleting = false;
+  bulkSaving = false;
+  bulkEditor: BulkDailyCheckinEditor = this.createDefaultBulkEditor();
   error: string | null = null;
+  bulkMessage: string | null = null;
 
   constructor(private dailyCheckinApi: DailyCheckinApiService) {}
 
@@ -69,6 +84,10 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       month: 'long',
       year: 'numeric'
     }).format(new Date(year, month - 1, 1));
+  }
+
+  get bulkSelectedDaysCount(): number {
+    return this.getDateKeysBetween(this.bulkEditor.startDate, this.bulkEditor.endDate).length;
   }
 
   previousMonth(): void {
@@ -92,6 +111,24 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     this.error = null;
   }
 
+  useSelectedDateAsBulkStart(): void {
+    if (!this.editor?.checkInDate) return;
+    this.bulkEditor.startDate = this.editor.checkInDate;
+    if (!this.bulkEditor.endDate || this.bulkEditor.endDate < this.bulkEditor.startDate) {
+      this.bulkEditor.endDate = this.bulkEditor.startDate;
+    }
+    this.bulkMessage = null;
+  }
+
+  useSelectedDateAsBulkEnd(): void {
+    if (!this.editor?.checkInDate) return;
+    this.bulkEditor.endDate = this.editor.checkInDate;
+    if (!this.bulkEditor.startDate || this.bulkEditor.startDate > this.bulkEditor.endDate) {
+      this.bulkEditor.startDate = this.bulkEditor.endDate;
+    }
+    this.bulkMessage = null;
+  }
+
   closeEditor(): void {
     this.editor = null;
     this.selectedEntry = null;
@@ -112,12 +149,66 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     }).subscribe({
       next: () => {
         this.saving = false;
+        this.checkinsChanged.emit();
         this.closeEditor();
         this.loadCalendar();
       },
       error: () => {
         this.saving = false;
         this.error = 'Failed to save daily check-in';
+      }
+    });
+  }
+
+  applyBulkUpdate(): void {
+    if (!this.memberId || this.bulkSaving) return;
+
+    const dateKeys = this.getDateKeysBetween(this.bulkEditor.startDate, this.bulkEditor.endDate);
+    if (!dateKeys.length) {
+      this.error = 'Select a valid start and end date for bulk update';
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Update ${dateKeys.length} day${dateKeys.length === 1 ? '' : 's'} to ${this.bulkEditor.status.toLowerCase()}?`
+    );
+    if (!confirmed) return;
+
+    const entriesByDate = new Map((this.calendar?.days || []).map((day) => [day.checkInDate, day]));
+    const markActive = this.bulkEditor.status === 'ACTIVE';
+    const bulkSteps = this.bulkEditor.stepsCount == null
+      ? null
+      : Math.max(0, Number(this.bulkEditor.stepsCount || 0));
+    const notes = this.bulkEditor.notes.trim();
+
+    this.bulkSaving = true;
+    this.error = null;
+    this.bulkMessage = null;
+
+    forkJoin(dateKeys.map((checkInDate) => {
+      const existing = entriesByDate.get(checkInDate);
+      const stepsCount = markActive
+        ? (bulkSteps ?? Math.max(0, Number(existing?.stepsCount || 0)))
+        : 0;
+
+      return this.dailyCheckinApi.upsertDailyCheckin({
+        memberId: this.memberId,
+        checkInDate,
+        exerciseDone: markActive,
+        stepsCount,
+        notes: notes || existing?.notes || null
+      });
+    })).subscribe({
+      next: () => {
+        this.bulkSaving = false;
+        this.bulkMessage = `Updated ${dateKeys.length} day${dateKeys.length === 1 ? '' : 's'} successfully`;
+        this.checkinsChanged.emit();
+        this.closeEditor();
+        this.loadCalendar();
+      },
+      error: () => {
+        this.bulkSaving = false;
+        this.error = 'Failed to bulk update daily check-ins';
       }
     });
   }
@@ -133,6 +224,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     this.dailyCheckinApi.deleteDailyCheckin(this.selectedEntry.id).subscribe({
       next: () => {
         this.deleting = false;
+        this.checkinsChanged.emit();
         this.closeEditor();
         this.loadCalendar();
       },
@@ -177,6 +269,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   private shiftMonth(offset: number): void {
     const [year, month] = this.visibleMonth.split('-').map(Number);
     this.visibleMonth = this.getMonthKey(new Date(year, month - 1 + offset, 1));
+    this.bulkEditor = this.createDefaultBulkEditor();
     this.closeEditor();
     this.loadCalendar();
   }
@@ -213,5 +306,48 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     const year = value.getFullYear();
     const month = String(value.getMonth() + 1).padStart(2, '0');
     return `${year}-${month}`;
+  }
+
+  private createDefaultBulkEditor(): BulkDailyCheckinEditor {
+    const [year, month] = this.visibleMonth.split('-').map(Number);
+    const firstDate = `${this.visibleMonth}-01`;
+    const lastDate = `${this.visibleMonth}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+
+    return {
+      startDate: firstDate,
+      endDate: lastDate,
+      status: 'ACTIVE',
+      stepsCount: null,
+      notes: ''
+    };
+  }
+
+  private getDateKeysBetween(startDate: string, endDate: string): string[] {
+    if (!startDate || !endDate || startDate > endDate) return [];
+
+    const keys: string[] = [];
+    const cursor = this.parseDateKey(startDate);
+    const last = this.parseDateKey(endDate);
+
+    if (!cursor || !last) return [];
+
+    while (cursor <= last) {
+      keys.push(this.getDateKey(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return keys;
+  }
+
+  private parseDateKey(value: string): Date | null {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  }
+
+  private getDateKey(value: Date): string {
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${value.getFullYear()}-${month}-${day}`;
   }
 }

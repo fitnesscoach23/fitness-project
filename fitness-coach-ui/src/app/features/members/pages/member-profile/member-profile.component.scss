@@ -1138,6 +1138,240 @@ input:focus {
   padding: 16px;
 }
 
+.daily-consistency-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.daily-consistency-layout .card {
+  margin: 0;
+}
+
+.weekly-report-capture {
+  background: #ffffff;
+}
+
+.weekly-consistency-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.weekly-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.weekly-report-capture.exporting-report .weekly-export-btn {
+  display: none;
+}
+
+.weekly-consistency-header .card-title {
+  margin: 0 0 6px;
+}
+
+.weekly-consistency-subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.weekly-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.weekly-trend.improving {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.weekly-trend.declining {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.compact-state {
+  margin: 4px 0 0;
+}
+
+.weekly-consistency-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) minmax(220px, 0.8fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.week-score-panel,
+.weekly-formula-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.week-score-panel {
+  display: grid;
+  align-content: start;
+}
+
+.muted-panel {
+  background: #f9fafb;
+}
+
+.week-score-label {
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.week-score-range {
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.week-score-value {
+  margin-top: 12px;
+  color: #2563eb;
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.week-score-rating {
+  margin-top: 6px;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.week-score-metrics,
+.weekly-formula-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.week-score-metrics {
+  margin-top: 16px;
+}
+
+.week-score-metrics div,
+.weekly-formula-panel div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #eef2f7;
+}
+
+.week-score-metrics label,
+.weekly-formula-panel label {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.week-score-metrics span,
+.weekly-formula-panel span {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.manual-feedback-panel {
+  margin-top: 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 16px;
+}
+
+.manual-feedback-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.manual-feedback-header h4 {
+  margin: 0;
+  color: #111827;
+  font-size: 15px;
+}
+
+.manual-feedback-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.manual-feedback-score {
+  color: #2563eb;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.manual-feedback-editor {
+  margin-top: 14px;
+}
+
+.manual-feedback-editor textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+  color: #111827;
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  background: #ffffff;
+}
+
+.manual-feedback-export {
+  display: none;
+  margin-top: 14px;
+  border-top: 1px solid #dbeafe;
+  padding-top: 14px;
+}
+
+.manual-feedback-export p {
+  margin: 0;
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.manual-feedback-placeholder {
+  color: #94a3b8 !important;
+}
+
+.weekly-report-capture.exporting-report .manual-feedback-editor {
+  display: none;
+}
+
+.weekly-report-capture.exporting-report .manual-feedback-export {
+  display: block;
+}
+
 @media (max-width: 980px) {
   .overview-grid {
     grid-template-columns: 1fr;
@@ -1171,5 +1405,22 @@ input:focus {
 
   .weight-card {
     position: static;
+  }
+
+  .weekly-consistency-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .weekly-header-actions {
+    justify-content: flex-start;
+  }
+
+  .weekly-consistency-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-feedback-header {
+    flex-direction: column;
   }
 }

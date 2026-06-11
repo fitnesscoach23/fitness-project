@@ -63,12 +63,25 @@
             <span *ngIf="!p.createdAt">Created date unavailable</span>
             <span class="dot">•</span>
             <span>{{ p.gridRows?.length || 0 }} rows</span>
+            <ng-container *ngIf="p.targetStepsCount != null">
+              <span class="dot">•</span>
+              <span>{{ p.targetStepsCount | number }} target steps</span>
+            </ng-container>
           </p>
           <ng-container *ngIf="editablePlanId !== p.id; else editablePlanNotes">
             <p class="plan-notes" *ngIf="p.notes">{{ p.notes }}</p>
             <p class="plan-notes muted" *ngIf="!p.notes">No additional notes.</p>
           </ng-container>
           <ng-template #editablePlanNotes>
+            <div class="field-group inline-steps-field">
+              <label>Target Steps Count</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                [(ngModel)]="p.targetStepsCount"
+                placeholder="e.g. 10000" />
+            </div>
             <div class="notes-panel inline-notes-panel">
               <label>Additional Notes</label>
               <textarea
@@ -287,6 +300,17 @@
       <div class="field-group">
         <label for="planTitle">Plan Title</label>
         <input id="planTitle" [(ngModel)]="title" placeholder="e.g. 4-Day Hypertrophy Block" />
+      </div>
+
+      <div class="field-group">
+        <label for="targetStepsCount">Target Steps Count</label>
+        <input
+          id="targetStepsCount"
+          type="number"
+          min="0"
+          step="1"
+          [(ngModel)]="targetStepsCount"
+          placeholder="e.g. 10000" />
       </div>
     </div>
 

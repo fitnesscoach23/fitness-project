@@ -50,6 +50,7 @@ class WorkoutServiceTest {
                 .coachEmail("coach@example.com")
                 .title("Old Title")
                 .notes("Old Notes")
+                .targetStepsCount(7000)
                 .createdAt(Instant.now())
                 .build();
 
@@ -58,11 +59,12 @@ class WorkoutServiceTest {
         service.updatePlan(
                 "coach@example.com",
                 planId,
-                new UpdateWorkoutPlanRequest("Updated Title", "Updated Notes")
+                new UpdateWorkoutPlanRequest("Updated Title", "Updated Notes", 9000)
         );
 
         assertEquals("Updated Title", plan.getTitle());
         assertEquals("Updated Notes", plan.getNotes());
+        assertEquals(9000, plan.getTargetStepsCount());
         verify(planRepo).save(plan);
     }
 
@@ -76,7 +78,7 @@ class WorkoutServiceTest {
                 () -> service.updatePlan(
                         "coach@example.com",
                         planId,
-                        new UpdateWorkoutPlanRequest("Updated Title", "Updated Notes")
+                        new UpdateWorkoutPlanRequest("Updated Title", "Updated Notes", 9000)
                 )
         );
 
@@ -103,7 +105,7 @@ class WorkoutServiceTest {
                 () -> service.updatePlan(
                         "coach@example.com",
                         planId,
-                        new UpdateWorkoutPlanRequest("Updated Title", "Updated Notes")
+                        new UpdateWorkoutPlanRequest("Updated Title", "Updated Notes", 9000)
                 )
         );
 

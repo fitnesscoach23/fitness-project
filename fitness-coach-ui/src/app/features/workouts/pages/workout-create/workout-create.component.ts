@@ -48,6 +48,7 @@ export class WorkoutCreateComponent implements OnInit {
   memberId: string | null = null;
   title = '';
   notes = '';
+  targetStepsCount: number | null = null;
 
   loading = false;
   loadingMembers = true;
@@ -148,7 +149,8 @@ emptyRow(dayName = ''): WorkoutGridRow {
       .createWorkoutPlan({
         memberId: this.memberId,
         title: this.title,
-        notes: this.notes
+        notes: this.notes,
+        targetStepsCount: this.normalizeTargetStepsCount(this.targetStepsCount)
       })
       .pipe(finalize(() => (this.loading = false)))
       .subscribe({
@@ -560,7 +562,8 @@ delete$
       this.workoutApi
         .updateWorkoutPlan(plan.id, {
           title: plan.title,
-          notes: plan.notes
+          notes: plan.notes,
+          targetStepsCount: this.normalizeTargetStepsCount(plan.targetStepsCount)
         })
         .pipe(mapTo(void 0))
     ),
@@ -681,6 +684,7 @@ startCreate() {
   this.mode = 'EDIT';
   this.title = '';
   this.notes = '';
+  this.targetStepsCount = null;
   this.newPlanRows = [this.emptyRow('Day 1')];
 }
 
@@ -701,7 +705,8 @@ saveAndAssign() {
   this.workoutApi.createWorkoutPlan({
     memberId: this.memberId,
     title: this.title,
-    notes: this.notes
+    notes: this.notes,
+    targetStepsCount: this.normalizeTargetStepsCount(this.targetStepsCount)
   })
   .pipe(
     concatMap((planId: string) => {
@@ -731,6 +736,7 @@ saveAndAssign() {
 cancelCreate() {
   this.creatingNewPlan = false;
   this.newPlanRows = [];
+  this.targetStepsCount = null;
   this.mode = 'VIEW';
 }
 
@@ -869,6 +875,15 @@ private getDayCopySelections(rows: WorkoutGridRow[]): Map<string, string> {
   }
 
   return selections;
+}
+
+private normalizeTargetStepsCount(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+
+  return Math.max(0, Math.floor(parsed));
 }
 
 }

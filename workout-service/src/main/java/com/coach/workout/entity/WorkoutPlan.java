@@ -30,6 +30,9 @@ public class WorkoutPlan {
     private String title;
 
     private String notes;
+
+    private Integer targetStepsCount;
+
     @Column(nullable = false)
     private Instant createdAt;
     private Instant updatedAt;
