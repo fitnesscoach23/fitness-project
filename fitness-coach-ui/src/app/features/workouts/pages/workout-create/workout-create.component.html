@@ -18,6 +18,17 @@
 
       <div class="meta" *ngIf="memberId">
         <span class="meta-pill">{{ memberPlans.length }} plans</span>
+        <label
+          class="btn btn-secondary import-workout-btn"
+          for="workoutExcelUpload">
+          Import From Excel
+        </label>
+        <input
+          id="workoutExcelUpload"
+          type="file"
+          accept=".xlsx,.xls"
+          class="hidden-file-input"
+          (change)="onWorkoutExcelSelected($event)" />
         <button
           type="button"
           class="btn btn-primary"
@@ -26,6 +37,12 @@
           + Create Workout Plan
         </button>
       </div>
+    </div>
+
+    <div *ngIf="workoutExcelMessage || workoutExcelError" class="import-status">
+      <span *ngIf="workoutExcelFileName" class="file-name">{{ workoutExcelFileName }}</span>
+      <span *ngIf="workoutExcelMessage">{{ workoutExcelMessage }}</span>
+      <span *ngIf="workoutExcelError" class="import-error">{{ workoutExcelError }}</span>
     </div>
   </section>
 
@@ -89,6 +106,34 @@
                 placeholder="Goals, constraints, progression cues, warmup focus, technique reminders"></textarea>
             </div>
           </ng-template>
+        </div>
+
+        <div class="plan-actions plan-top-actions">
+          <button
+            *ngIf="editablePlanId !== p.id"
+            type="button"
+            class="btn btn-secondary"
+            (click)="enableEdit(p)">
+            Edit
+          </button>
+
+          <button
+            *ngIf="editablePlanId === p.id"
+            type="button"
+            class="btn btn-primary"
+            (click)="savePlan(p)"
+            [disabled]="savingPlanId === p.id">
+            {{ savingPlanId === p.id ? 'Saving...' : 'Save' }}
+          </button>
+
+          <button
+            *ngIf="editablePlanId === p.id"
+            type="button"
+            class="btn btn-secondary"
+            (click)="cancelEdit(p)"
+            [disabled]="savingPlanId === p.id">
+            Cancel
+          </button>
         </div>
       </header>
 
@@ -294,6 +339,15 @@
   <section *ngIf="creatingNewPlan" class="create-card">
     <div class="section-header">
       <h2>New Workout Plan</h2>
+
+      <div class="right-actions">
+        <button class="btn btn-primary" (click)="saveAndAssign()" [disabled]="loading">
+          {{ loading ? 'Saving...' : 'Save & Assign' }}
+        </button>
+        <button class="btn btn-secondary" (click)="cancelCreate()" [disabled]="loading">
+          Cancel
+        </button>
+      </div>
     </div>
 
     <div class="create-grid">

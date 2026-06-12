@@ -55,6 +55,11 @@ type DietMealViewModel = {
   items: DietItemViewModel[];
 };
 export type WeeklyConsistencyTrend = 'improving' | 'declining' | 'stable';
+type WeeklyScoreRating = {
+  label: string;
+  color: string;
+  className: 'excellent' | 'good' | 'average' | 'needs-improvement';
+};
 type WeeklyConsistencyScore = {
   label: string;
   rangeLabel: string;
@@ -66,6 +71,8 @@ type WeeklyConsistencyScore = {
   stepsCompliance: number;
   score: number;
   rating: string;
+  ratingColor: string;
+  ratingClass: WeeklyScoreRating['className'];
 };
 
 @Component({
@@ -118,7 +125,9 @@ export class MemberProfileComponent implements OnInit {
   currentWeekConsistency: WeeklyConsistencyScore | null = null;
   previousWeekConsistency: WeeklyConsistencyScore | null = null;
   weeklyConsistencyTrend: WeeklyConsistencyTrend = 'stable';
+  weeklyScoreDifference = 0;
   weeklyManualFeedback = '';
+  private weeklyFeedbackManuallyEdited = false;
   capturingWeeklyReport = false;
   dietPlan: any = null;
   dietLoading = true;
@@ -1539,6 +1548,11 @@ loadWeeklyConsistency() {
           this.currentWeekConsistency?.score,
           this.previousWeekConsistency?.score
         );
+        this.weeklyScoreDifference = this.getWeeklyScoreDifference(
+          this.currentWeekConsistency?.score,
+          this.previousWeekConsistency?.score
+        );
+        this.syncGeneratedCoachFeedback();
         this.weeklyConsistencyLoading = false;
       },
       error: () => {
@@ -1564,13 +1578,10 @@ private buildWeeklyConsistencyScore(
   const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
   const plannedWorkouts = this.getPlannedWorkoutsPerWeek();
   const stepTarget = Math.max(0, Number(this.activeWorkoutPlan?.targetStepsCount || 0));
-  const workoutCompliance = plannedWorkouts > 0
-    ? Math.min(100, (completedWorkouts / plannedWorkouts) * 100)
-    : 0;
-  const stepsCompliance = stepTarget > 0
-    ? Math.min(100, (averageDailySteps / stepTarget) * 100)
-    : 0;
-  const score = (workoutCompliance * 0.7) + (stepsCompliance * 0.3);
+  const workoutCompliance = this.calculateWorkoutCompliance(completedWorkouts, plannedWorkouts);
+  const stepsCompliance = this.calculateStepsCompliance(averageDailySteps, stepTarget);
+  const score = this.calculateWeeklyScore(workoutCompliance, stepsCompliance);
+  const rating = this.getScoreRating(score);
 
   return {
     label,
@@ -1582,7 +1593,9 @@ private buildWeeklyConsistencyScore(
     workoutCompliance: this.roundTo(workoutCompliance, 1),
     stepsCompliance: this.roundTo(stepsCompliance, 1),
     score: this.roundTo(score, 0),
-    rating: this.getConsistencyRating(score)
+    rating: rating.label,
+    ratingColor: rating.color,
+    ratingClass: rating.className
   };
 }
 
@@ -1590,12 +1603,39 @@ private getPlannedWorkoutsPerWeek(): number {
   return Array.isArray(this.activeWorkoutPlan?.days) ? this.activeWorkoutPlan.days.length : 0;
 }
 
-private getConsistencyRating(score: number): string {
-  if (score >= 90) return 'Excellent';
-  if (score >= 80) return 'Good';
-  if (score >= 70) return 'Decent';
-  if (score >= 60) return 'Below Target';
-  return 'Needs Improvement';
+calculateWorkoutCompliance(completedWorkouts: number, plannedWorkouts: number): number {
+  return plannedWorkouts > 0
+    ? Math.min(100, (Math.max(0, completedWorkouts) / plannedWorkouts) * 100)
+    : 0;
+}
+
+calculateStepsCompliance(averageDailySteps: number, stepTarget: number): number {
+  return stepTarget > 0
+    ? Math.min(100, (Math.max(0, averageDailySteps) / stepTarget) * 100)
+    : 0;
+}
+
+calculateWeeklyScore(workoutCompliance: number, stepsCompliance: number): number {
+  return (workoutCompliance * 0.7) + (stepsCompliance * 0.3);
+}
+
+getScoreRating(score: number | null | undefined): WeeklyScoreRating {
+  const value = Number(score || 0);
+  if (value >= 90) return { label: 'Excellent', color: '#16a34a', className: 'excellent' };
+  if (value >= 80) return { label: 'Good', color: '#2563eb', className: 'good' };
+  if (value >= 70) return { label: 'Average', color: '#f97316', className: 'average' };
+  return { label: 'Needs Improvement', color: '#dc2626', className: 'needs-improvement' };
+}
+
+getTrend(
+  currentScore: number | null | undefined,
+  previousScore: number | null | undefined
+): WeeklyConsistencyTrend {
+  if (currentScore == null || previousScore == null) return 'stable';
+  const difference = currentScore - previousScore;
+  if (difference >= 5) return 'improving';
+  if (difference <= -5) return 'declining';
+  return 'stable';
 }
 
 getWeeklyConsistencyTrendLabel(): string {
@@ -1614,11 +1654,107 @@ private getWeeklyConsistencyTrend(
   currentScore: number | null | undefined,
   previousScore: number | null | undefined
 ): WeeklyConsistencyTrend {
-  if (currentScore == null || previousScore == null) return 'stable';
-  const difference = currentScore - previousScore;
-  if (difference >= 5) return 'improving';
-  if (difference <= -5) return 'declining';
-  return 'stable';
+  return this.getTrend(currentScore, previousScore);
+}
+
+getWeeklyTrendDifferenceLabel(): string {
+  if (this.weeklyConsistencyTrend === 'stable') return 'Stable';
+  const prefix = this.weeklyScoreDifference > 0 ? '+' : '';
+  return `${prefix}${this.weeklyScoreDifference} points`;
+}
+
+generateNextWeekFocus(week: WeeklyConsistencyScore | null = this.currentWeekConsistency): string {
+  if (!week) return 'Review consistency once this week has check-ins.';
+
+  if (week.workoutCompliance < 80 && week.stepsCompliance < 80) {
+    return 'Complete workouts and hit step target more consistently.';
+  }
+
+  if (week.workoutCompliance >= 90 && week.stepsCompliance >= 90) {
+    return 'Maintain the same consistency next week.';
+  }
+
+  if (week.workoutCompliance < week.stepsCompliance) {
+    return 'Complete all planned workouts.';
+  }
+
+  if (week.stepsCompliance < week.workoutCompliance) {
+    return 'Improve daily step consistency.';
+  }
+
+  return 'Keep workouts and steps consistent next week.';
+}
+
+getMissedWorkouts(week: WeeklyConsistencyScore | null = this.currentWeekConsistency): number {
+  if (!week) return 0;
+  return Math.max(0, week.plannedWorkouts - week.completedWorkouts);
+}
+
+generateCoachFeedback(
+  current: WeeklyConsistencyScore | null = this.currentWeekConsistency,
+  previous: WeeklyConsistencyScore | null = this.previousWeekConsistency,
+  trend: WeeklyConsistencyTrend = this.weeklyConsistencyTrend
+): string {
+  if (!current) return '';
+
+  const messages: string[] = [];
+
+  if (current.score >= 90) {
+    messages.push('Excellent work this week! You stayed highly consistent with your workouts and steps. Keep maintaining this momentum next week. 🔥');
+  } else if (current.score >= 80) {
+    messages.push('Good work this week 👍 You are staying consistent overall. The main focus next week is to improve the weaker area and push the score above 90.');
+  } else if (current.score >= 70) {
+    messages.push('Decent effort this week. You are moving in the right direction, but there is room to improve consistency. Let’s focus on completing planned workouts and hitting steps more regularly.');
+  } else {
+    messages.push('Consistency was below target this week. Before changing the plan, let’s focus on completing workouts and improving daily activity. Small actions done consistently will drive results.');
+  }
+
+  if (previous) {
+    if (trend === 'declining') {
+      messages.push('Your score has dropped compared to last week, so let’s identify what affected consistency and improve next week.');
+    } else if (trend === 'improving') {
+      messages.push('Great improvement compared to last week. Keep building on this progress.');
+    }
+  }
+
+  if (current.workoutCompliance < 80) {
+    messages.push('Priority: Complete all scheduled workouts.');
+  }
+
+  if (current.stepsCompliance < 80) {
+    messages.push('Priority: Improve daily step count consistency.');
+  }
+
+  return messages.join(' ');
+}
+
+getCoachAction(score: number | null | undefined = this.currentWeekConsistency?.score): { label: string; className: string } {
+  const value = Number(score || 0);
+  if (value >= 85) return { label: 'No action needed', className: 'no-action' };
+  if (value >= 70) return { label: 'Send encouragement', className: 'encouragement' };
+  return { label: 'Follow-up recommended', className: 'follow-up' };
+}
+
+onWeeklyFeedbackChanged(): void {
+  this.weeklyFeedbackManuallyEdited = true;
+}
+
+regenerateWeeklyFeedback(): void {
+  this.weeklyManualFeedback = this.generateCoachFeedback();
+  this.weeklyFeedbackManuallyEdited = false;
+}
+
+private getWeeklyScoreDifference(
+  currentScore: number | null | undefined,
+  previousScore: number | null | undefined
+): number {
+  if (currentScore == null || previousScore == null) return 0;
+  return this.roundTo(currentScore - previousScore, 0);
+}
+
+private syncGeneratedCoachFeedback(): void {
+  if (this.weeklyFeedbackManuallyEdited) return;
+  this.weeklyManualFeedback = this.generateCoachFeedback();
 }
 
 private getWeekStart(value: Date): Date {

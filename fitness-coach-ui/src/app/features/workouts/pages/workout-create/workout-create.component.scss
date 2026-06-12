@@ -84,6 +84,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .meta-pill {
@@ -100,9 +101,45 @@
   color: var(--text-secondary);
 }
 
+.hidden-file-input {
+  display: none;
+}
+
+.import-workout-btn {
+  margin: 0;
+}
+
+.import-status {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.file-name {
+  color: #334155;
+  font-weight: 600;
+}
+
+.import-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .section-header h2 {
   margin: 0;
   font-size: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .plans-section {
@@ -173,6 +210,11 @@
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--border-light);
+  justify-content: flex-end;
+}
+
+.plan-top-actions {
+  flex: 0 0 auto;
   justify-content: flex-end;
 }
 
@@ -496,8 +538,15 @@
     justify-content: stretch;
   }
 
-  .plan-footer-actions .btn {
+  .plan-footer-actions .btn,
+  .plan-top-actions .btn,
+  .section-header .right-actions .btn {
     flex: 1 1 150px;
+  }
+
+  .plan-top-actions,
+  .section-header .right-actions {
+    width: 100%;
   }
 
 }

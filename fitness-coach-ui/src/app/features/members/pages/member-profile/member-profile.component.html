@@ -882,6 +882,23 @@
           </p>
         </div>
         <div class="weekly-header-actions">
+          <div
+            class="weekly-trend"
+            [ngClass]="{
+              'improving': weeklyConsistencyTrend === 'improving',
+              'declining': weeklyConsistencyTrend === 'declining'
+            }">
+            <span *ngIf="weeklyConsistencyTrend === 'improving'">📈</span>
+            <span *ngIf="weeklyConsistencyTrend === 'declining'">📉</span>
+            <span *ngIf="weeklyConsistencyTrend === 'stable'">→</span>
+            {{ getWeeklyTrendDifferenceLabel() }}
+          </div>
+          <div
+            class="coach-action-badge"
+            data-html2canvas-ignore="true"
+            [ngClass]="getCoachAction().className">
+            {{ getCoachAction().label }}
+          </div>
           <button
             type="button"
             class="secondary-btn weekly-export-btn"
@@ -890,15 +907,6 @@
             (click)="captureWeeklyReport()">
             {{ capturingWeeklyReport ? 'Exporting...' : 'Export Image' }}
           </button>
-          <div
-            class="weekly-trend"
-            [ngClass]="{
-              'improving': weeklyConsistencyTrend === 'improving',
-              'declining': weeklyConsistencyTrend === 'declining'
-            }">
-            <span>{{ getWeeklyConsistencyTrendSymbol() }}</span>
-            {{ getWeeklyConsistencyTrendLabel() }}
-          </div>
         </div>
       </div>
 
@@ -913,7 +921,7 @@
       <div
         *ngIf="!weeklyConsistencyLoading && !weeklyConsistencyError"
         class="weekly-consistency-grid">
-        <div class="week-score-panel" *ngIf="currentWeekConsistency as current">
+        <div class="week-score-panel" *ngIf="currentWeekConsistency as current" [ngClass]="current.ratingClass">
           <div class="week-score-label">{{ current.label }}</div>
           <div class="week-score-range">{{ current.rangeLabel }}</div>
           <div class="week-score-value">{{ current.score }}</div>
@@ -922,16 +930,28 @@
           <div class="week-score-metrics">
             <div>
               <label>Workout Compliance</label>
-              <span>{{ current.workoutCompliance | number:'1.0-1' }}%</span>
+              <span>
+                {{ current.workoutCompliance | number:'1.0-0' }}%
+                ({{ current.completedWorkouts }}/{{ current.plannedWorkouts }} workouts)
+              </span>
+            </div>
+            <div class="weekly-progress-track">
+              <span [style.width.%]="current.workoutCompliance"></span>
             </div>
             <div>
               <label>Steps Compliance</label>
-              <span>{{ current.stepsCompliance | number:'1.0-1' }}%</span>
+              <span>
+                {{ current.stepsCompliance | number:'1.0-0' }}%
+                ({{ current.averageDailySteps | number:'1.0-0' }} / {{ current.stepTarget | number:'1.0-0' }} avg steps)
+              </span>
+            </div>
+            <div class="weekly-progress-track">
+              <span [style.width.%]="current.stepsCompliance"></span>
             </div>
           </div>
         </div>
 
-        <div class="week-score-panel muted-panel" *ngIf="previousWeekConsistency as previous">
+        <div class="week-score-panel muted-panel" *ngIf="previousWeekConsistency as previous" [ngClass]="previous.ratingClass">
           <div class="week-score-label">{{ previous.label }}</div>
           <div class="week-score-range">{{ previous.rangeLabel }}</div>
           <div class="week-score-value">{{ previous.score }}</div>
@@ -940,19 +960,36 @@
           <div class="week-score-metrics">
             <div>
               <label>Workout Compliance</label>
-              <span>{{ previous.workoutCompliance | number:'1.0-1' }}%</span>
+              <span>
+                {{ previous.workoutCompliance | number:'1.0-0' }}%
+                ({{ previous.completedWorkouts }}/{{ previous.plannedWorkouts }} workouts)
+              </span>
+            </div>
+            <div class="weekly-progress-track">
+              <span [style.width.%]="previous.workoutCompliance"></span>
             </div>
             <div>
               <label>Steps Compliance</label>
-              <span>{{ previous.stepsCompliance | number:'1.0-1' }}%</span>
+              <span>
+                {{ previous.stepsCompliance | number:'1.0-0' }}%
+                ({{ previous.averageDailySteps | number:'1.0-0' }} / {{ previous.stepTarget | number:'1.0-0' }} avg steps)
+              </span>
+            </div>
+            <div class="weekly-progress-track">
+              <span [style.width.%]="previous.stepsCompliance"></span>
             </div>
           </div>
         </div>
 
         <div class="weekly-formula-panel" *ngIf="currentWeekConsistency as current">
+          <div class="weekly-summary-title">Weekly Summary</div>
           <div>
             <label>Completed Workouts</label>
             <span>{{ current.completedWorkouts }} / {{ current.plannedWorkouts }}</span>
+          </div>
+          <div>
+            <label>Workouts Missed</label>
+            <span>{{ getMissedWorkouts(current) }} days</span>
           </div>
           <div>
             <label>Average Daily Steps</label>
@@ -962,7 +999,18 @@
             <label>Step Target</label>
             <span>{{ current.stepTarget ? (current.stepTarget | number) : '-' }}</span>
           </div>
+          <div>
+            <label>Trend</label>
+            <span>{{ getWeeklyConsistencyTrendLabel() }} · {{ getWeeklyTrendDifferenceLabel() }}</span>
+          </div>
         </div>
+      </div>
+
+      <div
+        *ngIf="!weeklyConsistencyLoading && !weeklyConsistencyError"
+        class="next-week-focus-panel">
+        <label>Next Week Focus</label>
+        <p>{{ generateNextWeekFocus() }}</p>
       </div>
 
       <div
@@ -972,14 +1020,26 @@
           <div>
             <h4>Coach Feedback</h4>
           </div>
-          <div class="manual-feedback-score">{{ currentWeekConsistency?.score || 0 }}</div>
+          <div
+            class="manual-feedback-score"
+            [style.color]="currentWeekConsistency?.ratingColor">
+            {{ currentWeekConsistency?.score || 0 }}
+          </div>
         </div>
 
         <div class="manual-feedback-editor" data-html2canvas-ignore="true">
           <textarea
             rows="4"
             [(ngModel)]="weeklyManualFeedback"
+            (ngModelChange)="onWeeklyFeedbackChanged()"
             placeholder="Example: Strong week overall. Keep workouts consistent and focus on daily movement next week."></textarea>
+          <button
+            type="button"
+            class="secondary-btn regenerate-feedback-btn"
+            (click)="regenerateWeeklyFeedback()"
+            [disabled]="!currentWeekConsistency">
+            Regenerate Feedback
+          </button>
         </div>
 
         <div class="manual-feedback-export">

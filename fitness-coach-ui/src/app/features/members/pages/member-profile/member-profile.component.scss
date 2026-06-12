@@ -1204,6 +1204,28 @@ input:focus {
   color: #991b1b;
 }
 
+.coach-action-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.coach-action-badge.no-action {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.coach-action-badge.encouragement {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .compact-state {
   margin: 4px 0 0;
 }
@@ -1226,6 +1248,20 @@ input:focus {
 .week-score-panel {
   display: grid;
   align-content: start;
+  --score-color: #dc2626;
+  border-top: 4px solid var(--score-color);
+}
+
+.week-score-panel.excellent {
+  --score-color: #16a34a;
+}
+
+.week-score-panel.good {
+  --score-color: #2563eb;
+}
+
+.week-score-panel.average {
+  --score-color: #f97316;
 }
 
 .muted-panel {
@@ -1246,7 +1282,7 @@ input:focus {
 
 .week-score-value {
   margin-top: 12px;
-  color: #2563eb;
+  color: var(--score-color);
   font-size: 42px;
   line-height: 1;
   font-weight: 800;
@@ -1254,7 +1290,7 @@ input:focus {
 
 .week-score-rating {
   margin-top: 6px;
-  color: #111827;
+  color: var(--score-color);
   font-size: 15px;
   font-weight: 700;
 }
@@ -1292,6 +1328,56 @@ input:focus {
   font-size: 14px;
   font-weight: 700;
   text-align: right;
+}
+
+.week-score-metrics .weekly-progress-track {
+  display: block;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.weekly-progress-track span {
+  display: block;
+  min-width: 4px;
+  max-width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--score-color);
+}
+
+.weekly-formula-panel .weekly-summary-title {
+  display: block;
+  padding-top: 0;
+  border-top: 0;
+  color: #111827;
+  font-weight: 800;
+}
+
+.next-week-focus-panel {
+  margin-top: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  padding: 14px 16px;
+}
+
+.next-week-focus-panel label {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.next-week-focus-panel p {
+  margin: 6px 0 0;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .manual-feedback-panel {
@@ -1343,6 +1429,10 @@ input:focus {
   line-height: 1.5;
   resize: vertical;
   background: #ffffff;
+}
+
+.regenerate-feedback-btn {
+  margin-top: 10px;
 }
 
 .manual-feedback-export {

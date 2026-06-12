@@ -8,6 +8,8 @@ import { ExerciseLibraryApiService } from '../../../../core/api/exercise-library
 import { of, Observable } from 'rxjs';
 import { concatMap, finalize, mapTo } from 'rxjs/operators';
 
+declare const XLSX: any;
+
 interface WorkoutGridRow {
   dayName: string;
   exerciseName: string;
@@ -65,6 +67,9 @@ export class WorkoutCreateComponent implements OnInit {
   gridRows: WorkoutGridRow[] = [];
   editablePlanId: string | null = null;
   savingPlanId: string | null = null;
+  workoutExcelFileName = '';
+  workoutExcelMessage: string | null = null;
+  workoutExcelError: string | null = null;
   // phase-5 state
 deletingPlanId: string | null = null;
 mode: 'VIEW' | 'EDIT' = 'VIEW';
@@ -737,7 +742,68 @@ cancelCreate() {
   this.creatingNewPlan = false;
   this.newPlanRows = [];
   this.targetStepsCount = null;
+  this.workoutExcelFileName = '';
+  this.workoutExcelMessage = null;
+  this.workoutExcelError = null;
   this.mode = 'VIEW';
+}
+
+onWorkoutExcelSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  this.workoutExcelFileName = file.name;
+  this.workoutExcelMessage = null;
+  this.workoutExcelError = null;
+
+  if (typeof XLSX === 'undefined') {
+    this.workoutExcelError = 'Excel parser is not loaded. Please refresh and try again.';
+    input.value = '';
+    return;
+  }
+
+  if (this.creatingNewPlan && this.newPlanRows.some((row) => this.hasWorkoutRowValue(row))) {
+    const confirmed = window.confirm('Replace the current workout plan draft with this Excel import?');
+    if (!confirmed) {
+      input.value = '';
+      return;
+    }
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const wb = XLSX.read(reader.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const matrix: any[][] = XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        raw: false,
+        defval: ''
+      });
+
+      const imported = this.parseWorkoutPlanExcel(matrix, ws, file.name);
+      if (!imported.rows.length) {
+        this.workoutExcelError = 'No valid workout rows found in the uploaded Excel.';
+        input.value = '';
+        return;
+      }
+
+      this.title = imported.title;
+      this.notes = imported.notes;
+      this.targetStepsCount = imported.targetStepsCount;
+      this.newPlanRows = imported.rows;
+      this.creatingNewPlan = true;
+      this.mode = 'EDIT';
+      this.workoutExcelMessage = `Imported ${imported.exerciseCount} exercise(s) across ${imported.dayCount} day(s). Review and save when ready.`;
+      input.value = '';
+    } catch {
+      this.workoutExcelError = 'Failed to read Excel. Please upload a valid workout plan .xlsx file.';
+      input.value = '';
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
 }
 
 private rebuildPlanFromGrid(
@@ -884,6 +950,144 @@ private normalizeTargetStepsCount(value: number | string | null | undefined): nu
   if (!Number.isFinite(parsed)) return null;
 
   return Math.max(0, Math.floor(parsed));
+}
+
+private parseWorkoutPlanExcel(matrix: any[][], worksheet: any, fileName: string): {
+  title: string;
+  notes: string;
+  targetStepsCount: number | null;
+  rows: WorkoutGridRow[];
+  dayCount: number;
+  exerciseCount: number;
+} {
+  const firstCell = this.getExcelCellText(matrix, 0, 0);
+  const targetStepsCount = this.parseTargetStepsFromText(this.getExcelCellText(matrix, 1, 0));
+  const notesText = this.getExcelCellText(matrix, 2, 0);
+  const notes = notesText.replace(/^notes:\s*/i, '').trim();
+  const headerIndex = this.findWorkoutHeaderIndex(matrix);
+  const rows: WorkoutGridRow[] = [];
+
+  let currentDayName = '';
+  let exerciseCount = 0;
+  const dayNames = new Set<string>();
+
+  for (let i = headerIndex + 1; i < matrix.length; i++) {
+    const row = matrix[i] || [];
+    const first = this.getExcelCellText(matrix, i, 0);
+    const exerciseName = this.getExcelCellText(matrix, i, 1);
+    const setsValue = this.getExcelCellText(matrix, i, 2);
+    const reps = this.getExcelCellText(matrix, i, 3);
+    const videoCellText = this.getExcelCellText(matrix, i, 4);
+
+    if (first && !exerciseName && /^day\b/i.test(first)) {
+      currentDayName = first;
+      dayNames.add(currentDayName);
+      continue;
+    }
+
+    if (!exerciseName) {
+      continue;
+    }
+
+    if (!currentDayName) {
+      currentDayName = `Day ${dayNames.size + 1}`;
+      dayNames.add(currentDayName);
+    }
+
+    const setCount = this.parsePositiveInteger(setsValue) || 1;
+    const videoUrl = this.getExcelHyperlink(worksheet, i, 4) || (/^https?:\/\//i.test(videoCellText) ? videoCellText : '');
+    const libraryMatch = this.findExerciseLibraryMatch(exerciseName);
+    exerciseCount += 1;
+
+    rows.push({
+      dayName: currentDayName,
+      exerciseName,
+      muscleGroup: libraryMatch?.muscleGroup || '',
+      musclesTrained: libraryMatch?.musclesTrained || '',
+      setNumber: setCount,
+      reps,
+      videoUrl: videoUrl || this.normalizeVideoUrl(libraryMatch?.videoUrl || '')
+    });
+  }
+
+  return {
+    title: this.deriveWorkoutImportTitle(firstCell, fileName),
+    notes: notes && notes !== '-' ? notes : '',
+    targetStepsCount,
+    rows,
+    dayCount: dayNames.size || (rows.length ? 1 : 0),
+    exerciseCount
+  };
+}
+
+private findWorkoutHeaderIndex(matrix: any[][]): number {
+  const normalize = (value: any) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const index = matrix.findIndex((row) => {
+    const headers = (row || []).map(normalize);
+    return headers.includes('section') && headers.includes('exercise') && headers.includes('sets') && headers.includes('reps');
+  });
+
+  return index >= 0 ? index : 4;
+}
+
+private getExcelCellText(matrix: any[][], rowIndex: number, colIndex: number): string {
+  return String(matrix[rowIndex]?.[colIndex] ?? '').trim();
+}
+
+private getExcelHyperlink(worksheet: any, rowIndex: number, colIndex: number): string {
+  const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+  const target = worksheet?.[cellRef]?.l?.Target || '';
+  return this.normalizeVideoUrl(target);
+}
+
+private parsePositiveInteger(value: string): number | null {
+  const match = String(value || '').match(/\d+/);
+  if (!match) return null;
+
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
+}
+
+private parseTargetStepsFromText(value: string): number | null {
+  const match = String(value || '').match(/target\s*steps\s*:\s*([\d,]+)/i);
+  if (!match) return null;
+
+  return this.normalizeTargetStepsCount(match[1].replace(/,/g, ''));
+}
+
+private deriveWorkoutImportTitle(firstCell: string, fileName: string): string {
+  const exportedTitle = firstCell
+    .replace(/\([^)]*\)\s*$/, '')
+    .replace(/^exercise\s+plan\s+for\s+/i, '')
+    .trim();
+
+  if (exportedTitle) {
+    return `Imported Workout Plan - ${exportedTitle}`;
+  }
+
+  return fileName.replace(/\.(xlsx|xls)$/i, '').replace(/[-_]+/g, ' ').trim() || 'Imported Workout Plan';
+}
+
+private findExerciseLibraryMatch(exerciseName: string): any | null {
+  const normalizedName = exerciseName.trim().toLowerCase();
+  if (!normalizedName) return null;
+
+  return this.exerciseLibraryItems.find(
+    (ex: any) => String(ex?.exerciseName || '').trim().toLowerCase() === normalizedName
+  ) || null;
+}
+
+private hasWorkoutRowValue(row: WorkoutGridRow): boolean {
+  return !!(
+    row.dayName?.trim() ||
+    row.exerciseName?.trim() ||
+    row.muscleGroup?.trim() ||
+    row.musclesTrained?.trim() ||
+    row.reps?.trim() ||
+    row.videoUrl?.trim() ||
+    row.setNumber != null
+  );
 }
 
 }
