@@ -29,8 +29,20 @@ export class NotificationHomeComponent implements OnInit {
   error: string | null = null;
   sendMessage: string | null = null;
 
-  channelOptions: NotificationChannel[] = ['EMAIL', 'SMS'];
-  typeOptions: NotificationType[] = ['WELCOME', 'PAYMENT_REMINDER', 'GENERIC'];
+  channelOptions: NotificationChannel[] = ['EMAIL', 'SMS', 'WHATSAPP'];
+  typeOptions: NotificationType[] = [
+    'WELCOME',
+    'PAYMENT_REMINDER',
+    'PAYMENT_SUCCESS',
+    'PAYMENT_FAILED',
+    'CHECKIN_REMINDER',
+    'CHECKIN_RECEIVED',
+    'WEEKLY_CONSISTENCY_REPORT',
+    'PROGRESS_COMPARISON',
+    'WORKOUT_PLAN',
+    'DIET_PLAN',
+    'GENERIC'
+  ];
   statusOptions: NotificationStatus[] = ['PENDING', 'SENT', 'FAILED'];
 
   composeForm: {
@@ -124,7 +136,7 @@ export class NotificationHomeComponent implements OnInit {
 
   onComposeChannelChange() {
     this.syncRecipientFromMember();
-    if (this.composeForm.channel === 'SMS') {
+    if (this.composeForm.channel !== 'EMAIL') {
       this.composeForm.subject = '';
     } else if (!this.composeForm.subject.trim()) {
       this.composeForm.subject = this.getDefaultSubject(this.composeForm.type);
@@ -256,12 +268,28 @@ export class NotificationHomeComponent implements OnInit {
   private getDefaultSubject(type: NotificationType): string {
     if (type === 'WELCOME') return 'Welcome to your program';
     if (type === 'PAYMENT_REMINDER') return 'Payment reminder';
+    if (type === 'PAYMENT_SUCCESS') return 'Payment received';
+    if (type === 'PAYMENT_FAILED') return 'Payment failed';
+    if (type === 'CHECKIN_REMINDER') return 'Check-in reminder';
+    if (type === 'CHECKIN_RECEIVED') return 'Check-in received';
+    if (type === 'WEEKLY_CONSISTENCY_REPORT') return 'Weekly consistency report';
+    if (type === 'PROGRESS_COMPARISON') return 'Progress comparison';
+    if (type === 'WORKOUT_PLAN') return 'Workout plan';
+    if (type === 'DIET_PLAN') return 'Diet plan';
     return 'Notification from your coach';
   }
 
   private getDefaultMessage(type: NotificationType): string {
     if (type === 'WELCOME') return 'Welcome to the program.';
     if (type === 'PAYMENT_REMINDER') return 'Friendly reminder: your payment is due.';
+    if (type === 'PAYMENT_SUCCESS') return 'Your payment has been received. Thank you.';
+    if (type === 'PAYMENT_FAILED') return 'Your payment could not be completed. Please try again.';
+    if (type === 'CHECKIN_REMINDER') return 'Reminder: please complete your check-in today.';
+    if (type === 'CHECKIN_RECEIVED') return 'Your check-in has been received.';
+    if (type === 'WEEKLY_CONSISTENCY_REPORT') return 'Here is your weekly consistency report.';
+    if (type === 'PROGRESS_COMPARISON') return 'Here is your progress comparison update.';
+    if (type === 'WORKOUT_PLAN') return 'Your workout plan is attached.';
+    if (type === 'DIET_PLAN') return 'Your diet plan is ready.';
     return 'You have a new update from your coach.';
   }
 }

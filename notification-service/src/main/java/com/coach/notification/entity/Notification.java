@@ -58,6 +58,12 @@ public class Notification {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @Column
+    private String provider;
+
+    @Column(name = "provider_message_id")
+    private String providerMessageId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

@@ -28,8 +28,8 @@
           <label>Active Since</label>
           <input
             type="date"
-            [(ngModel)]="overrideActiveSince"
-            (ngModelChange)="onOverrideActiveSinceChange()" />
+            [ngModel]="displayedActiveSince"
+            readonly />
         </div>
 
         <div>
@@ -69,7 +69,7 @@
           <label>Record Manual Payment</label>
           <div class="inline-form">
             <input type="number" placeholder="Amount" [(ngModel)]="paymentAmount" />
-            <input type="date" [(ngModel)]="manualPaymentDate" />
+            <input type="date" [ngModel]="manualPaymentDate" readonly />
             <button class="primary-btn" (click)="startManualPayment()" [disabled]="paymentActionLoading">
               {{ paymentActionLoading ? 'Processing...' : 'Confirm' }}
             </button>
@@ -130,7 +130,7 @@
       <div class="summary-actions">
         <button
           class="secondary-btn"
-          [disabled]="!selectedMemberId || memberStatusUpdating || selectedMemberSystemStatus === 'ACTIVE' || isExpired(displayedRenewalDate)"
+          [disabled]="!selectedMemberId || memberStatusUpdating || selectedMemberSystemStatus === 'ACTIVE'"
           (click)="setMemberStatus(selectedMemberId, 'ACTIVE')">
           Mark Active
         </button>
@@ -212,7 +212,7 @@
             <td>
               <button
                 class="secondary-btn mini-btn"
-                [disabled]="memberStatusUpdating || row.memberStatus === 'ACTIVE' || !canActivateMember(row)"
+                [disabled]="memberStatusUpdating || row.memberStatus === 'ACTIVE'"
                 (click)="setMemberStatus(row.id, 'ACTIVE')">
                 Active
               </button>

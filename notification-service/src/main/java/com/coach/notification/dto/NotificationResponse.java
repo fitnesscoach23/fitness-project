@@ -17,6 +17,8 @@ public record NotificationResponse(
         String message,
         NotificationStatus status,
         String errorMessage,
+        String provider,
+        String providerMessageId,
         Instant createdAt,
         Instant updatedAt
 ) {

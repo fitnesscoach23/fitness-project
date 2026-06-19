@@ -82,7 +82,7 @@ export class BillingHomeComponent implements OnInit {
   }
 
   get displayedActiveSince(): string {
-    return this.overrideActiveSince || this.getOriginalSubscriptionStartDate() || '-';
+    return this.getSelectedMemberCreatedDate() || this.getOriginalSubscriptionStartDate() || '-';
   }
 
   get displayedRenewalDate(): string {
@@ -130,6 +130,7 @@ export class BillingHomeComponent implements OnInit {
 
     this.selectedMember = this.members.find((m) => m.id === this.selectedMemberId) || null;
     this.loadSubscriptionOverride();
+    this.syncManualPaymentDateWithRenewalDate();
     this.loadSelectedMemberBilling();
   }
 
@@ -161,12 +162,11 @@ export class BillingHomeComponent implements OnInit {
         this.calculatePaymentSummary();
 
         const originalStartDate = this.getOriginalSubscriptionStartDate();
-        if (!this.overrideActiveSince && originalStartDate) {
-          this.overrideActiveSince = this.normalizeDateInput(originalStartDate);
-        }
+        this.overrideActiveSince = this.getSelectedMemberCreatedDate() || this.normalizeDateInput(originalStartDate || '');
         if (!this.overrideRenewalDate && this.subscription?.endDate) {
           this.overrideRenewalDate = this.normalizeDateInput(this.subscription.endDate);
         }
+        this.syncManualPaymentDateWithRenewalDate();
 
         this.subscriptionLoading = false;
         this.paymentsLoading = false;
@@ -245,8 +245,11 @@ export class BillingHomeComponent implements OnInit {
       return;
     }
 
-    if (!this.overrideActiveSince) {
-      this.overrideMessage = 'Active Since is required';
+    const activeSince = this.getSelectedMemberCreatedDate() || this.overrideActiveSince;
+    this.overrideActiveSince = activeSince;
+
+    if (!activeSince) {
+      this.overrideMessage = 'Member creation date is required';
       return;
     }
 
@@ -260,7 +263,7 @@ export class BillingHomeComponent implements OnInit {
     }
 
     const payload = {
-      activeSince: this.overrideActiveSince,
+      activeSince,
       renewalDate: this.overrideRenewalDate,
       cycle: this.overrideCycle,
       autoCalculate: this.autoCalculateRenewal
@@ -268,6 +271,7 @@ export class BillingHomeComponent implements OnInit {
 
     localStorage.setItem(this.getOverrideStorageKey(this.selectedMemberId), JSON.stringify(payload));
     this.overrideMessage = 'Subscription override saved';
+    this.syncManualPaymentDateWithRenewalDate();
     this.loadAllMemberBilling();
   }
 
@@ -278,13 +282,12 @@ export class BillingHomeComponent implements OnInit {
     this.overrideMessage = 'Subscription override cleared';
     this.overrideCycle = 'MONTHLY';
     this.autoCalculateRenewal = true;
-    this.overrideActiveSince = this.subscription?.startDate
-      ? this.normalizeDateInput(this.subscription.startDate)
-      : '';
+    this.overrideActiveSince = this.getSelectedMemberCreatedDate();
     this.overrideRenewalDate = this.subscription?.endDate
       ? this.normalizeDateInput(this.subscription.endDate)
       : '';
 
+    this.syncManualPaymentDateWithRenewalDate();
     this.loadAllMemberBilling();
   }
 
@@ -299,6 +302,7 @@ export class BillingHomeComponent implements OnInit {
 
     start.setMonth(start.getMonth() + cycleMonths);
     this.overrideRenewalDate = start.toISOString().slice(0, 10);
+    this.syncManualPaymentDateWithRenewalDate();
   }
 
   private loadSubscriptionOverride(): void {
@@ -308,13 +312,13 @@ export class BillingHomeComponent implements OnInit {
     if (!stored) {
       this.overrideCycle = 'MONTHLY';
       this.autoCalculateRenewal = true;
-      this.overrideActiveSince = '';
+      this.overrideActiveSince = this.getSelectedMemberCreatedDate();
       this.overrideRenewalDate = '';
       this.overrideMessage = null;
       return;
     }
 
-    this.overrideActiveSince = stored.activeSince || '';
+    this.overrideActiveSince = this.getSelectedMemberCreatedDate();
     this.overrideRenewalDate = stored.renewalDate || '';
     this.overrideCycle = stored.cycle || 'MONTHLY';
     this.autoCalculateRenewal = stored.autoCalculate ?? true;
@@ -358,7 +362,8 @@ export class BillingHomeComponent implements OnInit {
   startManualPayment(): void {
     if (!this.selectedMemberId || !this.paymentAmount) return;
 
-    const paymentDate = this.manualPaymentDate || this.getTodayDateInput();
+    const paymentDate = this.getRenewalDateForManualPayment();
+    this.manualPaymentDate = paymentDate;
 
     this.paymentActionLoading = true;
     this.paymentActionError = null;
@@ -563,7 +568,6 @@ export class BillingHomeComponent implements OnInit {
   setMemberStatus(memberId: string, status: 'ACTIVE' | 'INACTIVE') {
     const row = this.billingRows.find((item) => item.id === memberId);
     if (!row) return;
-    if (status === 'ACTIVE' && this.isExpired(row.renewalDate)) return;
 
     this.memberStatusUpdating = true;
     this.memberStatusError = null;
@@ -580,7 +584,7 @@ export class BillingHomeComponent implements OnInit {
   }
 
   canActivateMember(row: BillingRow): boolean {
-    return !this.isExpired(row.renewalDate);
+    return row.memberStatus !== 'ACTIVE';
   }
 
   private autoMarkOverdueMembersInactive(rows: BillingRow[]) {
@@ -645,6 +649,14 @@ export class BillingHomeComponent implements OnInit {
     return new Date().toISOString().slice(0, 10);
   }
 
+  private getRenewalDateForManualPayment(): string {
+    return this.normalizeDateInput(this.displayedRenewalDate) || this.getTodayDateInput();
+  }
+
+  private syncManualPaymentDateWithRenewalDate(): void {
+    this.manualPaymentDate = this.getRenewalDateForManualPayment();
+  }
+
   private finalizeStartedManualPayment(paymentId: string, paymentDate: string): void {
     this.billingApi.confirmPayment(paymentId, paymentDate).subscribe({
       next: () => {
@@ -681,8 +693,9 @@ export class BillingHomeComponent implements OnInit {
 
     const paidOn = this.normalizeDateInput(paymentDate) || this.getTodayDateInput();
     const nextRenewal = this.addMonths(paidOn, this.getCycleMonths(this.overrideCycle));
+    const activeSince = this.getSelectedMemberCreatedDate() || this.overrideActiveSince || paidOn;
     const payload = {
-      activeSince: paidOn,
+      activeSince,
       renewalDate: nextRenewal,
       cycle: this.overrideCycle,
       autoCalculate: this.autoCalculateRenewal
@@ -692,7 +705,13 @@ export class BillingHomeComponent implements OnInit {
     this.overrideActiveSince = payload.activeSince;
     this.overrideRenewalDate = payload.renewalDate;
     this.overrideMessage = null;
-    this.manualPaymentDate = this.getTodayDateInput();
+    this.syncManualPaymentDateWithRenewalDate();
+  }
+
+  private getSelectedMemberCreatedDate(): string {
+    return this.normalizeDateInput(
+      this.selectedMember?.createdAt || this.selectedMember?.activeSince || ''
+    );
   }
 
   private getCycleMonths(cycle: OverrideCycle): number {
@@ -717,7 +736,7 @@ export class BillingHomeComponent implements OnInit {
     if (!this.selectedMemberId) return;
 
     localStorage.removeItem(this.getOverrideStorageKey(this.selectedMemberId));
-    this.overrideActiveSince = '';
+    this.overrideActiveSince = this.getSelectedMemberCreatedDate();
     this.overrideRenewalDate = '';
     this.overrideMessage = null;
   }

@@ -3,5 +3,13 @@ package com.coach.notification.entity;
 public enum NotificationType {
     WELCOME,
     PAYMENT_REMINDER,
+    PAYMENT_SUCCESS,
+    PAYMENT_FAILED,
+    CHECKIN_REMINDER,
+    CHECKIN_RECEIVED,
+    WEEKLY_CONSISTENCY_REPORT,
+    PROGRESS_COMPARISON,
+    WORKOUT_PLAN,
+    DIET_PLAN,
     GENERIC
 }

@@ -18,6 +18,7 @@ import {
   DailyCheckinApiService,
   DailyCheckinDay
 } from '../../../../core/services/daily-checkin-api.service';
+import { NotificationApiService } from '../../../../core/api/notification-api.service';
 
 declare const XLSX: any;
 
@@ -129,9 +130,18 @@ export class MemberProfileComponent implements OnInit {
   weeklyManualFeedback = '';
   private weeklyFeedbackManuallyEdited = false;
   capturingWeeklyReport = false;
+  sendingPaymentReminderWhatsApp = false;
+  paymentReminderWhatsAppMessage: string | null = null;
+  sendingWeeklyReportWhatsApp = false;
+  weeklyReportWhatsAppMessage: string | null = null;
+  sendingWorkoutPlanWhatsApp = false;
+  workoutPlanWhatsAppMessage: string | null = null;
   dietPlan: any = null;
   dietLoading = true;
   groupedDietMeals: DietMealViewModel[] = [];
+  dietWhatsAppMessageText = '';
+  dietWhatsAppStatus: string | null = null;
+  sendingDietWhatsApp = false;
   private dietPlanTotals: DietPlanTotals = { calories: null, protein: null, carbs: null, fats: null };
   private currentDietPlanSummaryText = 'NA';
   progressCheckins: any[] = [];
@@ -144,6 +154,8 @@ export class MemberProfileComponent implements OnInit {
   isProgressComparisonMaximized = false;
   comparisonZoomLevel = 1;
   capturingComparison = false;
+  sendingComparisonWhatsApp = false;
+  comparisonWhatsAppMessage: string | null = null;
   comparisonEnhancementPreset: ComparisonEnhancementPreset = 'sharp';
   comparisonEnhancement = {
     contrast: 112,
@@ -874,7 +886,8 @@ export class MemberProfileComponent implements OnInit {
     private dietApi: DietApiService,
     private dailyCheckinApi: DailyCheckinApiService,
     private progressCheckinApi: ProgressCheckinApiService,
-    private photoApi : ProgressCheckinPhotoApiService
+    private photoApi : ProgressCheckinPhotoApiService,
+    private notificationApi: NotificationApiService
   ) {
 
     Chart.register(...registerables);
@@ -921,6 +934,7 @@ removeMeasurement(index: number) {
     next: (res: any) => {
       this.member = res;
       this.initializeBodyMetrics();
+      this.loadSavedDietWhatsAppMessage();
       this.loadSubscriptionOverride();
       this.loading = false;
       this.loadSubscription();
@@ -965,9 +979,7 @@ loadSubscription() {
       this.subscriptionHistory = Array.isArray(res) ? res : [];
       this.subscription = this.subscriptionHistory.length ? this.subscriptionHistory[0] : null;
       const originalStartDate = this.getOriginalSubscriptionStartDate();
-      if (!this.overrideActiveSince && originalStartDate) {
-        this.overrideActiveSince = this.normalizeDateInput(originalStartDate);
-      }
+      this.overrideActiveSince = this.getMemberCreatedDate() || this.normalizeDateInput(originalStartDate || '');
       if (!this.overrideRenewalDate && this.subscription?.endDate) {
         this.overrideRenewalDate = this.normalizeDateInput(this.subscription.endDate);
       }
@@ -982,7 +994,7 @@ loadSubscription() {
 }
 
 get displayedActiveSince(): string {
-  return this.overrideActiveSince || this.getOriginalSubscriptionStartDate() || this.subscription?.startDate || '-';
+  return this.getMemberCreatedDate() || this.getOriginalSubscriptionStartDate() || this.subscription?.startDate || '-';
 }
 
 get displayedRenewalDate(): string {
@@ -1047,8 +1059,11 @@ onOverrideCycleChange() {
 saveSubscriptionOverride() {
   this.overrideMessage = null;
 
-  if (!this.overrideActiveSince) {
-    this.overrideMessage = 'Active Since is required';
+  const activeSince = this.getMemberCreatedDate() || this.overrideActiveSince;
+  this.overrideActiveSince = activeSince;
+
+  if (!activeSince) {
+    this.overrideMessage = 'Member creation date is required';
     return;
   }
 
@@ -1062,7 +1077,7 @@ saveSubscriptionOverride() {
   }
 
   const payload = {
-    activeSince: this.overrideActiveSince,
+    activeSince,
     renewalDate: this.overrideRenewalDate,
     cycle: this.overrideCycle,
     autoCalculate: this.autoCalculateRenewal
@@ -1077,9 +1092,7 @@ clearSubscriptionOverride() {
   this.overrideMessage = 'Subscription override cleared';
   this.overrideCycle = 'MONTHLY';
   this.autoCalculateRenewal = true;
-  this.overrideActiveSince = this.subscription?.startDate
-    ? this.normalizeDateInput(this.subscription.startDate)
-    : '';
+  this.overrideActiveSince = this.getMemberCreatedDate();
   this.overrideRenewalDate = this.subscription?.endDate
     ? this.normalizeDateInput(this.subscription.endDate)
     : '';
@@ -1117,7 +1130,7 @@ private loadSubscriptionOverride() {
 
   try {
     const parsed = JSON.parse(raw);
-    this.overrideActiveSince = parsed.activeSince || '';
+    this.overrideActiveSince = this.getMemberCreatedDate();
     this.overrideRenewalDate = parsed.renewalDate || '';
     this.overrideCycle = parsed.cycle || 'MONTHLY';
     this.autoCalculateRenewal = parsed.autoCalculate ?? true;
@@ -1130,6 +1143,10 @@ private normalizeDateInput(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toISOString().slice(0, 10);
+}
+
+private getMemberCreatedDate(): string {
+  return this.normalizeDateInput(this.member?.createdAt || this.member?.activeSince || '');
 }
 
   loadPayments() {
@@ -1880,6 +1897,72 @@ loadDiet() {
   });
 }
 
+private loadSavedDietWhatsAppMessage(): void {
+  if (!this.member?.id) return;
+
+  const saved = localStorage.getItem(this.getDietWhatsAppStorageKey(this.member.id));
+  this.dietWhatsAppMessageText = saved || this.getDefaultDietWhatsAppMessage();
+}
+
+saveDietWhatsAppMessage(): void {
+  if (!this.member?.id) return;
+
+  localStorage.setItem(
+    this.getDietWhatsAppStorageKey(this.member.id),
+    this.dietWhatsAppMessageText.trim()
+  );
+  this.dietWhatsAppStatus = 'Diet message saved.';
+}
+
+sendDietPlanWhatsApp(): void {
+  if (!this.member?.id || this.sendingDietWhatsApp) return;
+
+  const recipient = this.getMemberWhatsAppRecipient();
+  if (!recipient) {
+    this.dietWhatsAppStatus = 'Add a phone number for this member before sending WhatsApp updates.';
+    return;
+  }
+
+  const message = this.dietWhatsAppMessageText.trim();
+  if (!message) {
+    this.dietWhatsAppStatus = 'Add diet message text before sending.';
+    return;
+  }
+
+  this.saveDietWhatsAppMessage();
+  this.sendingDietWhatsApp = true;
+  this.dietWhatsAppStatus = 'Sending diet plan on WhatsApp...';
+
+  this.notificationApi.send({
+    memberId: this.member.id,
+    channel: 'WHATSAPP',
+    type: 'DIET_PLAN',
+    recipient,
+    message,
+    templateParameters: [message]
+  }).subscribe({
+    next: (res) => {
+      this.sendingDietWhatsApp = false;
+      this.dietWhatsAppStatus = res.status === 'SENT'
+        ? 'Diet plan sent on WhatsApp.'
+        : 'Diet plan send failed. Check notification history for Meta error details.';
+    },
+    error: () => {
+      this.sendingDietWhatsApp = false;
+      this.dietWhatsAppStatus = 'Unable to send diet plan on WhatsApp.';
+    }
+  });
+}
+
+private getDietWhatsAppStorageKey(memberId: string): string {
+  return `member:${memberId}:diet-whatsapp-message`;
+}
+
+private getDefaultDietWhatsAppMessage(): string {
+  const name = this.member?.fullName || 'Member';
+  return `🥗 Diet Plan for ${name}\n\n💧 Hydration First\nDrink plenty of water throughout the day 🚰\nAim for at least 2.5-3 litres daily`;
+}
+
 goToCreateDiet() {
   console.log('Navigating to create diet', this.member.id);
 
@@ -1892,14 +1975,21 @@ goToCreateDiet() {
 }
 
 exportWorkoutPlanToExcel() {
+  const exportFile = this.buildWorkoutPlanExport();
+  if (!exportFile) return;
+
+  XLSX.writeFile(exportFile.workbook, exportFile.fileName);
+}
+
+private buildWorkoutPlanExport(): { workbook: any; fileName: string } | null {
   if (!this.activeWorkoutPlan) {
     alert('No active workout plan found to export.');
-    return;
+    return null;
   }
 
   if (typeof XLSX === 'undefined') {
     alert('Excel exporter not loaded. Please refresh and try again.');
-    return;
+    return null;
   }
 
   const dateLabel = new Intl.DateTimeFormat('en-GB').format(new Date());
@@ -1978,7 +2068,7 @@ exportWorkoutPlanToExcel() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet 1');
   const fileName = `Exercise-Plan-${(this.member?.fullName || 'Member').replace(/\s+/g, '-')}.xlsx`;
-  XLSX.writeFile(wb, fileName);
+  return { workbook: wb, fileName };
 }
 
 private groupExercisesForExport(exercises: any[]): Array<{ name: string; videoUrl: string | null; sets: any[] }> {
@@ -2287,23 +2377,9 @@ async captureProgressComparison() {
   this.cdr.detectChanges();
 
   try {
-    await this.waitForComparisonImages(captureElement);
-    const html2canvas = (await import('html2canvas')).default;
-
-    const canvas = await html2canvas(captureElement, {
-      backgroundColor: '#fffefb',
-      scale: Math.min(window.devicePixelRatio || 1, 2),
-      useCORS: true,
-      allowTaint: false,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: captureElement.scrollWidth,
-      windowHeight: captureElement.scrollHeight
-    });
-
     const link = document.createElement('a');
     link.download = this.getProgressComparisonFileName();
-    link.href = canvas.toDataURL('image/png');
+    link.href = await this.captureComparisonImageDataUrl(captureElement);
     link.click();
   } catch {
     alert('Unable to capture screenshot. Please wait for photos to load and try again.');
@@ -2314,6 +2390,88 @@ async captureProgressComparison() {
   }
 }
 
+async sendProgressComparisonWhatsApp(): Promise<void> {
+  const captureElement = this.comparisonCaptureRef?.nativeElement;
+  if (!captureElement || !this.member?.id || this.sendingComparisonWhatsApp) return;
+
+  const recipient = this.getMemberWhatsAppRecipient();
+  if (!recipient) {
+    this.comparisonWhatsAppMessage = 'Add a phone number for this member before sending WhatsApp updates.';
+    return;
+  }
+
+  this.sendingComparisonWhatsApp = true;
+  this.comparisonWhatsAppMessage = 'Preparing high-resolution comparison image...';
+  const previousZoom = this.comparisonZoomLevel;
+  this.comparisonZoomLevel = 1;
+  this.cdr.detectChanges();
+
+  try {
+    const imageDataUrl = await this.captureComparisonImageDataUrl(captureElement);
+
+    this.notificationApi.send({
+      memberId: this.member.id,
+      channel: 'WHATSAPP',
+      type: 'PROGRESS_COMPARISON',
+      recipient,
+      message: this.buildProgressComparisonWhatsAppText(),
+      templateParameters: this.getProgressComparisonTemplateParameters(),
+      imageDataUrl,
+      imageFileName: this.getProgressComparisonFileName()
+    }).subscribe({
+      next: () => {
+        this.sendingComparisonWhatsApp = false;
+        this.comparisonWhatsAppMessage = 'Progress comparison sent on WhatsApp.';
+      },
+      error: () => {
+        this.sendingComparisonWhatsApp = false;
+        this.comparisonWhatsAppMessage = 'Unable to send progress comparison on WhatsApp.';
+      }
+    });
+  } catch {
+    this.sendingComparisonWhatsApp = false;
+    this.comparisonWhatsAppMessage = 'Unable to create progress comparison image.';
+  } finally {
+    this.comparisonZoomLevel = previousZoom;
+    this.cdr.detectChanges();
+  }
+}
+
+private async captureComparisonImageDataUrl(captureElement: HTMLElement): Promise<string> {
+  await this.waitForComparisonImages(captureElement);
+  const html2canvas = (await import('html2canvas')).default;
+
+  const canvas = await html2canvas(captureElement, {
+    backgroundColor: '#fffefb',
+    scale: Math.min(window.devicePixelRatio || 1, 3),
+    useCORS: true,
+    allowTaint: false,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: captureElement.scrollWidth,
+    windowHeight: captureElement.scrollHeight
+  });
+
+  return canvas.toDataURL('image/png');
+}
+
+private async captureWeeklyReportImageDataUrl(captureElement: HTMLElement): Promise<string> {
+  const html2canvas = (await import('html2canvas')).default;
+
+  const canvas = await html2canvas(captureElement, {
+    backgroundColor: '#ffffff',
+    scale: Math.min(window.devicePixelRatio || 1, 3),
+    useCORS: true,
+    allowTaint: false,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: captureElement.scrollWidth,
+    windowHeight: captureElement.scrollHeight
+  });
+
+  return canvas.toDataURL('image/png');
+}
+
 async captureWeeklyReport() {
   const captureElement = this.weeklyReportCaptureRef?.nativeElement;
   if (!captureElement || this.capturingWeeklyReport || !this.currentWeekConsistency) return;
@@ -2322,22 +2480,9 @@ async captureWeeklyReport() {
   this.cdr.detectChanges();
 
   try {
-    const html2canvas = (await import('html2canvas')).default;
-
-    const canvas = await html2canvas(captureElement, {
-      backgroundColor: '#ffffff',
-      scale: Math.min(window.devicePixelRatio || 1, 2),
-      useCORS: true,
-      allowTaint: false,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: captureElement.scrollWidth,
-      windowHeight: captureElement.scrollHeight
-    });
-
     const link = document.createElement('a');
     link.download = this.getWeeklyReportFileName();
-    link.href = canvas.toDataURL('image/png');
+    link.href = await this.captureWeeklyReportImageDataUrl(captureElement);
     link.click();
   } catch {
     alert('Unable to export weekly report image. Please try again.');
@@ -2345,6 +2490,199 @@ async captureWeeklyReport() {
     this.capturingWeeklyReport = false;
     this.cdr.detectChanges();
   }
+}
+
+sendPaymentReminderWhatsApp(): void {
+  if (!this.member?.id || this.sendingPaymentReminderWhatsApp) return;
+
+  const recipient = this.getMemberWhatsAppRecipient();
+  if (!recipient) {
+    this.paymentReminderWhatsAppMessage = 'Add a phone number for this member before sending WhatsApp updates.';
+    return;
+  }
+
+  this.paymentReminderWhatsAppMessage = 'Use Dashboard > Billing Attention Center to send the payment reminder with the approved image template.';
+}
+
+async sendWeeklyReportWhatsApp(): Promise<void> {
+  const captureElement = this.weeklyReportCaptureRef?.nativeElement;
+  if (!captureElement || !this.member?.id || this.sendingWeeklyReportWhatsApp || !this.currentWeekConsistency) return;
+
+  const recipient = this.getMemberWhatsAppRecipient();
+  if (!recipient) {
+    this.weeklyReportWhatsAppMessage = 'Add a phone number for this member before sending WhatsApp updates.';
+    return;
+  }
+
+  this.sendingWeeklyReportWhatsApp = true;
+  this.weeklyReportWhatsAppMessage = 'Preparing high-resolution consistency image...';
+
+  try {
+    const imageDataUrl = await this.captureWeeklyReportImageDataUrl(captureElement);
+
+    this.notificationApi.send({
+      memberId: this.member.id,
+      channel: 'WHATSAPP',
+      type: 'WEEKLY_CONSISTENCY_REPORT',
+      recipient,
+      message: this.buildWeeklyReportWhatsAppText(),
+      templateParameters: this.getWeeklyReportTemplateParameters(),
+      imageDataUrl,
+      imageFileName: this.getWeeklyReportFileName()
+    }).subscribe({
+      next: () => {
+        this.sendingWeeklyReportWhatsApp = false;
+        this.weeklyReportWhatsAppMessage = 'Weekly report sent on WhatsApp.';
+      },
+      error: () => {
+        this.sendingWeeklyReportWhatsApp = false;
+        this.weeklyReportWhatsAppMessage = 'Unable to send weekly report on WhatsApp.';
+      }
+    });
+  } catch {
+    this.sendingWeeklyReportWhatsApp = false;
+    this.weeklyReportWhatsAppMessage = 'Unable to create weekly report image.';
+  }
+}
+
+sendWorkoutPlanWhatsApp(): void {
+  if (!this.member?.id || this.sendingWorkoutPlanWhatsApp) return;
+
+  const recipient = this.getMemberWhatsAppRecipient();
+  if (!recipient) {
+    this.workoutPlanWhatsAppMessage = 'Add a phone number for this member before sending WhatsApp updates.';
+    return;
+  }
+
+  const exportFile = this.buildWorkoutPlanExport();
+  if (!exportFile) return;
+
+  this.sendingWorkoutPlanWhatsApp = true;
+  this.workoutPlanWhatsAppMessage = 'Preparing workout plan Excel...';
+
+  try {
+    const base64 = XLSX.write(exportFile.workbook, { bookType: 'xlsx', type: 'base64' });
+    const documentDataUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
+
+    this.notificationApi.send({
+      memberId: this.member.id,
+      channel: 'WHATSAPP',
+      type: 'WORKOUT_PLAN',
+      recipient,
+      message: this.buildWorkoutPlanWhatsAppText(),
+      templateParameters: this.getWorkoutPlanTemplateParameters(),
+      documentDataUrl,
+      documentFileName: exportFile.fileName
+    }).subscribe({
+      next: () => {
+        this.sendingWorkoutPlanWhatsApp = false;
+        this.workoutPlanWhatsAppMessage = 'Workout plan sent on WhatsApp.';
+      },
+      error: () => {
+        this.sendingWorkoutPlanWhatsApp = false;
+        this.workoutPlanWhatsAppMessage = 'Unable to send workout plan on WhatsApp.';
+      }
+    });
+  } catch {
+    this.sendingWorkoutPlanWhatsApp = false;
+    this.workoutPlanWhatsAppMessage = 'Unable to prepare workout plan Excel.';
+  }
+}
+
+private getMemberWhatsAppRecipient(): string | null {
+  const phone = String(this.member?.phone || '').trim();
+  return phone || null;
+}
+
+private getFirstName(value: string): string {
+  return String(value || 'there').trim().split(/\s+/)[0] || 'there';
+}
+
+private buildPaymentReminderWhatsAppText(): string {
+  const name = this.member?.fullName || 'there';
+  const amount = this.totalPending > 0 ? ` Pending amount: Rs ${this.totalPending}.` : '';
+  const renewal = this.displayedRenewalDate && this.displayedRenewalDate !== '-'
+    ? ` Renewal date: ${this.displayedRenewalDate}.`
+    : '';
+
+  return `Hi ${name}, this is a quick payment reminder from your fitness coach.${amount}${renewal} Please complete it when convenient.`;
+}
+
+private buildWeeklyReportWhatsAppText(): string {
+  const current = this.currentWeekConsistency;
+  if (!current) {
+    return '';
+  }
+
+  const feedback = this.weeklyManualFeedback.trim()
+    || this.generateCoachFeedback(current, this.previousWeekConsistency, this.weeklyConsistencyTrend);
+
+  return [
+    `Hi ${this.member?.fullName || 'there'}, here is your weekly consistency report.`,
+    `Week: ${current.rangeLabel}`,
+    `Score: ${current.score}/100 (${current.rating})`,
+    `Workouts: ${current.completedWorkouts}/${current.plannedWorkouts}`,
+    `Average steps: ${Math.round(current.averageDailySteps)} / ${Math.round(current.stepTarget)}`,
+    `Focus: ${this.generateNextWeekFocus(current)}`,
+    `Coach feedback: ${feedback}`
+  ].join('\n');
+}
+
+private getWeeklyReportTemplateParameters(): string[] {
+  const current = this.currentWeekConsistency;
+  if (!current) {
+    return [];
+  }
+
+  const feedback = this.weeklyManualFeedback.trim()
+    || this.generateCoachFeedback(current, this.previousWeekConsistency, this.weeklyConsistencyTrend);
+
+  return [
+    this.getFirstName(this.member?.fullName || 'there'),
+    current.rangeLabel,
+    `${current.score}/100 (${current.rating})`,
+    `${current.completedWorkouts}/${current.plannedWorkouts}`,
+    `${Math.round(current.averageDailySteps)} / ${Math.round(current.stepTarget)}`,
+    this.generateNextWeekFocus(current),
+    feedback
+  ];
+}
+
+private buildProgressComparisonWhatsAppText(): string {
+  return [
+    `Hi ${this.member?.fullName || 'there'}, here is your progress comparison update.`,
+    `Current check-in: ${this.formatProgressCheckinDate(this.currentCheckin?.submittedAt)}`,
+    `Previous check-in: ${this.formatProgressCheckinDate(this.previousCheckin?.submittedAt)}`,
+    `Weight change: ${this.getComparisonDelta('weight')}`,
+    `Steps change: ${this.getComparisonDelta('stepsAvg')}`,
+    `Coach notes: ${this.getComparisonNotes(this.currentCheckin)}`
+  ].join('\n');
+}
+
+private getProgressComparisonTemplateParameters(): string[] {
+  const weightChange = this.getComparisonDelta('weight');
+
+  return [
+    this.getFirstName(this.member?.fullName || 'there'),
+    this.formatProgressCheckinDate(this.currentCheckin?.submittedAt),
+    this.formatProgressCheckinDate(this.previousCheckin?.submittedAt),
+    weightChange === '-' ? '-' : `${weightChange} kg`,
+    this.getComparisonDelta('stepsAvg'),
+    this.getComparisonNotes(this.currentCheckin)
+  ];
+}
+
+private buildWorkoutPlanWhatsAppText(): string {
+  const targetSteps = this.activeWorkoutPlan?.targetStepsCount != null
+    ? ` Target steps: ${Math.round(this.activeWorkoutPlan.targetStepsCount)}.`
+    : '';
+  const title = this.activeWorkoutPlan?.title ? ` Plan: ${this.activeWorkoutPlan.title}.` : '';
+
+  return `Hi ${this.member?.fullName || 'there'}, your workout plan is attached.${title}${targetSteps} Please follow it as discussed.`;
+}
+
+private getWorkoutPlanTemplateParameters(): string[] {
+  return [this.getFirstName(this.member?.fullName || 'there')];
 }
 
 @HostListener('document:fullscreenchange')

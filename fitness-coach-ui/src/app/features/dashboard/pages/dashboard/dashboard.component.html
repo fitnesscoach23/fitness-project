@@ -244,6 +244,13 @@
             </div>
 
             <div class="snapshot-share-actions">
+              <button
+                type="button"
+                class="primary-action"
+                [disabled]="sendingCheckinWhatsApp"
+                (click)="sendCheckinReminderWhatsApp()">
+                {{ sendingCheckinWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+              </button>
               <button type="button" class="primary-action" (click)="downloadCheckinReminderScreenshot()">
                 Download Screenshot
               </button>
@@ -359,6 +366,13 @@
           </div>
 
           <div class="snapshot-share-actions">
+            <button
+              type="button"
+              class="primary-action"
+              [disabled]="sendingBillingWhatsApp"
+              (click)="sendBillingReminderWhatsApp()">
+              {{ sendingBillingWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+            </button>
             <button type="button" class="primary-action" (click)="downloadBillingScreenshot()">
               Download Screenshot
             </button>
@@ -414,9 +428,23 @@
               </div>
             </div>
 
+            <div class="snapshot-payment" *ngIf="billingUpiId || billingQrImageUrl">
+              <div class="snapshot-payment-copy">
+                <span>Payment Details</span>
+                <strong *ngIf="billingUpiId">{{ billingUpiId }}</strong>
+                <p>Scan the QR code or use the UPI ID to complete the renewal payment.</p>
+              </div>
+              <img
+                *ngIf="billingQrImageUrl"
+                [src]="billingQrImageUrl"
+                alt="UPI QR code"
+                class="snapshot-payment-qr" />
+            </div>
+
             <div class="snapshot-note">
               Hi {{ selectedDueMember.fullName }}, your membership renewal is pending. Please clear the due amount of
               {{ formatCurrency(selectedDueMember.totalPending) }} to continue your coaching plan.
+              <span *ngIf="billingUpiId">UPI ID: {{ billingUpiId }}.</span>
             </div>
           </div>
         </div>

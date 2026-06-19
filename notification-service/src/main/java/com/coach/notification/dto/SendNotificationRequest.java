@@ -6,6 +6,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.List;
 import java.util.UUID;
 
 public record SendNotificationRequest(
@@ -14,7 +15,12 @@ public record SendNotificationRequest(
         @NotNull NotificationType type,
         @NotBlank String recipient,
         String subject,
-        @NotBlank String message
+        @NotBlank String message,
+        String imageDataUrl,
+        String imageFileName,
+        String documentDataUrl,
+        String documentFileName,
+        List<String> templateParameters
 ) {
 
     @AssertTrue(message = "Subject is required for EMAIL notifications")

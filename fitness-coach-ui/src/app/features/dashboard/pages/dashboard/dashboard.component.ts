@@ -7,6 +7,8 @@ import { catchError, forkJoin, map, of } from 'rxjs';
 import { WorkoutApiService } from '../../../../core/services/workout-api.service';
 import { DietApiService } from '../../../../core/services/diet-api.service';
 import { ProgressCheckinApiService } from '../../../../core/services/progress-checkin-api.service';
+import { NotificationApiService } from '../../../../core/api/notification-api.service';
+import { environment } from '../../../../../environments/environment';
 
 type DueSoonMember = {
   id: string;
@@ -90,13 +92,16 @@ export class DashboardComponent implements OnInit {
   selectedCheckinMember: CheckinReminderRow | null = null;
   checkinShareStatus = '';
   billingShareStatus = '';
+  sendingCheckinWhatsApp = false;
+  sendingBillingWhatsApp = false;
 
   constructor(
     private memberApi: MemberApiService,
     private billingApi: BillingApiService,
     private workoutApi: WorkoutApiService,
     private dietApi: DietApiService,
-    private progressCheckinApi: ProgressCheckinApiService
+    private progressCheckinApi: ProgressCheckinApiService,
+    private notificationApi: NotificationApiService
   ) {}
 
   ngOnInit() {
@@ -304,18 +309,27 @@ export class DashboardComponent implements OnInit {
   getCheckinReminderMessage(member: CheckinReminderRow | null): string {
     if (!member) return '';
 
-    const firstName = this.getFirstName(member.fullName);
+    const [firstName, dueLabel, nextDue, formUrl] = this.getCheckinTemplateParameters(member);
 
     if (!member.cadenceConfigured) {
-      return `Hi ${firstName}, your progress check-in reminder schedule is being set up. Please share your latest progress update when requested.`;
+      return `Hello ${firstName},\nThis is a progress check-in reminder from TrainWithVarun. Your progress check-in reminder schedule is being set up. Please share your latest progress update when requested.\n\nCheck-in form: ${formUrl}\n\nPlease review the attached check-in summary and complete your update.`;
     }
 
-    const dueLabel = this.getCheckinDueLabel(member.daysUntilDue).toLowerCase();
-    const nextDue = this.formatDate(member.nextCheckinDate);
+    return `Hello ${firstName},\nThis is a progress check-in reminder from TrainWithVarun. Your progress check-in is ${dueLabel}. Please fill the check-in form so we can keep your plan moving.\n\nDue date: ${nextDue}.\n\nCheck-in form: ${formUrl}\n\nPlease review the attached check-in summary and complete your update.`;
+  }
 
-    return `Hi ${firstName}, your progress check-in is ${dueLabel}. 
-    Please fill the below checkin form , so we can keep your plan moving. 
-    Due date: ${nextDue}.`;
+  private getCheckinFormLine(): string {
+    const url = environment.checkinFormUrl?.trim();
+    return url ? ` Check-in form: ${url}` : '';
+  }
+
+  private getCheckinTemplateParameters(member: CheckinReminderRow): string[] {
+    return [
+      this.getFirstName(member.fullName).toUpperCase(),
+      member.cadenceConfigured ? this.getCheckinDueLabel(member.daysUntilDue).toLowerCase() : 'due',
+      this.formatDate(member.nextCheckinDate),
+      environment.checkinFormUrl?.trim() || '-'
+    ];
   }
 
   openCheckinReminderInGmail(): void {
@@ -349,19 +363,53 @@ export class DashboardComponent implements OnInit {
     this.checkinShareStatus = 'Preparing screenshot...';
 
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#ffffff',
-        scale: Math.min(window.devicePixelRatio || 1, 2),
-        useCORS: true
-      });
+      const imageDataUrl = await this.captureElementAsImageDataUrl(element);
       const link = document.createElement('a');
       link.download = `${this.slugify(this.selectedCheckinMember.fullName)}-checkin-reminder.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = imageDataUrl;
       link.click();
       this.checkinShareStatus = 'Screenshot downloaded.';
     } catch {
       this.checkinShareStatus = 'Could not create screenshot.';
+    }
+  }
+
+  async sendCheckinReminderWhatsApp(): Promise<void> {
+    if (!this.selectedCheckinMember || this.sendingCheckinWhatsApp) return;
+
+    if (!this.selectedCheckinMember.phone) {
+      this.checkinShareStatus = 'Add a phone number before sending WhatsApp.';
+      return;
+    }
+
+    this.sendingCheckinWhatsApp = true;
+    this.checkinShareStatus = 'Preparing WhatsApp image...';
+
+    try {
+      const imageDataUrl = await this.captureElementAsImageDataUrl(this.checkinReminderSnapshot?.nativeElement);
+
+      this.notificationApi.send({
+        memberId: this.selectedCheckinMember.id,
+        channel: 'WHATSAPP',
+        type: 'CHECKIN_REMINDER',
+        recipient: this.selectedCheckinMember.phone,
+        message: this.getCheckinReminderMessage(this.selectedCheckinMember),
+        templateParameters: this.getCheckinTemplateParameters(this.selectedCheckinMember),
+        imageDataUrl,
+        imageFileName: `${this.slugify(this.selectedCheckinMember.fullName)}-checkin-reminder.png`
+      }).subscribe({
+        next: () => {
+          this.sendingCheckinWhatsApp = false;
+          this.checkinShareStatus = 'WhatsApp image sent.';
+        },
+        error: () => {
+          this.sendingCheckinWhatsApp = false;
+          this.checkinShareStatus = 'Could not send WhatsApp image.';
+        }
+      });
+    } catch {
+      this.sendingCheckinWhatsApp = false;
+      this.checkinShareStatus = 'Could not create screenshot for WhatsApp.';
     }
   }
 
@@ -374,8 +422,26 @@ export class DashboardComponent implements OnInit {
   getBillingReminderMessage(member: DueSoonMember | null): string {
     if (!member) return '';
 
-    const firstName = this.getFirstName(member.fullName);
-    return `Hi ${firstName}, your membership renewal is pending. Please clear the due amount of ${this.formatCurrency(member.totalPending)} to continue your coaching plan. Renewal date: ${this.formatDate(member.renewalDate)}.`;
+    const [firstName, amount, renewalDate, upiId] = this.getBillingTemplateParameters(member);
+
+    return `Hello ${firstName},\nThis is a billing reminder from TrainWithVarun. Your membership renewal is pending. Please clear the due amount of ${amount} to continue your coaching plan.\n\nRenewal date: ${renewalDate}.\n\nYou can pay via UPI ID: ${upiId}. Please review the attached billing snapshot and payment details.`;
+  }
+
+  private getBillingTemplateParameters(member: DueSoonMember): string[] {
+    return [
+      this.getFirstName(member.fullName).toUpperCase(),
+      this.formatCurrency(member.totalPending),
+      this.formatDate(member.renewalDate),
+      this.billingUpiId || '-'
+    ];
+  }
+
+  get billingUpiId(): string {
+    return environment.billingUpiId?.trim() || '';
+  }
+
+  get billingQrImageUrl(): string {
+    return environment.billingQrImageUrl?.trim() || '';
   }
 
   openBillingReminderInGmail(): void {
@@ -409,20 +475,71 @@ export class DashboardComponent implements OnInit {
     this.billingShareStatus = 'Preparing screenshot...';
 
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#ffffff',
-        scale: Math.min(window.devicePixelRatio || 1, 2),
-        useCORS: true
-      });
+      const imageDataUrl = await this.captureElementAsImageDataUrl(element);
       const link = document.createElement('a');
       link.download = `${this.slugify(this.selectedDueMember.fullName)}-billing-reminder.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = imageDataUrl;
       link.click();
       this.billingShareStatus = 'Screenshot downloaded.';
     } catch {
       this.billingShareStatus = 'Could not create screenshot.';
     }
+  }
+
+  async sendBillingReminderWhatsApp(): Promise<void> {
+    if (!this.selectedDueMember || this.sendingBillingWhatsApp) return;
+
+    if (!this.selectedDueMember.phone) {
+      this.billingShareStatus = 'Add a phone number before sending WhatsApp.';
+      return;
+    }
+
+    this.sendingBillingWhatsApp = true;
+    this.billingShareStatus = 'Preparing WhatsApp image...';
+
+    try {
+      const imageDataUrl = await this.captureElementAsImageDataUrl(this.billingSnapshot?.nativeElement);
+
+      this.notificationApi.send({
+        memberId: this.selectedDueMember.id,
+        channel: 'WHATSAPP',
+        type: 'PAYMENT_REMINDER',
+        recipient: this.selectedDueMember.phone,
+        message: this.getBillingReminderMessage(this.selectedDueMember),
+        templateParameters: this.getBillingTemplateParameters(this.selectedDueMember),
+        imageDataUrl,
+        imageFileName: `${this.slugify(this.selectedDueMember.fullName)}-billing-reminder.png`
+      }).subscribe({
+        next: (res) => {
+          this.sendingBillingWhatsApp = false;
+          this.billingShareStatus = res.status === 'SENT'
+            ? 'WhatsApp image sent.'
+            : 'WhatsApp send failed. Check notification history for Meta error details.';
+        },
+        error: () => {
+          this.sendingBillingWhatsApp = false;
+          this.billingShareStatus = 'Could not send WhatsApp image.';
+        }
+      });
+    } catch {
+      this.sendingBillingWhatsApp = false;
+      this.billingShareStatus = 'Could not create screenshot for WhatsApp.';
+    }
+  }
+
+  private async captureElementAsImageDataUrl(element?: HTMLElement): Promise<string> {
+    if (!element) {
+      throw new Error('Missing screenshot element');
+    }
+
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: Math.min(window.devicePixelRatio || 1, 2),
+      useCORS: true
+    });
+
+    return canvas.toDataURL('image/png');
   }
 
   private loadDueSoonBilling(members: any[]): void {
@@ -481,7 +598,7 @@ export class DashboardComponent implements OnInit {
             email: member.email,
             phone: member.phone || '',
             planName: this.getBillingPlanName(subscription, override, renewalDate),
-            activeSince: override?.activeSince || subscription?.startDate || '',
+            activeSince: this.getMemberCreatedDate(member) || subscription?.startDate || '',
             renewalDate,
             daysRemaining,
             totalPending,
@@ -763,15 +880,11 @@ export class DashboardComponent implements OnInit {
   }
 
   private getCheckinActiveSinceDate(member: any, subscription: any | null): string {
-    const override = this.getStoredOverride(member.id);
+    return this.getMemberCreatedDate(member) || this.normalizeDateInput(subscription?.startDate || '');
+  }
 
-    return this.normalizeDateInput(
-      override?.activeSince
-      || subscription?.startDate
-      || member?.activeSince
-      || member?.createdAt
-      || ''
-    );
+  private getMemberCreatedDate(member: any): string {
+    return this.normalizeDateInput(member?.createdAt || member?.activeSince || '');
   }
 
   private getCheckinDateValue(value: string | null | undefined): number {

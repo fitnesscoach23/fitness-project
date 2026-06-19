@@ -10,6 +10,7 @@ import com.coach.notification.exception.NotFoundException;
 import com.coach.notification.provider.EmailSender;
 import com.coach.notification.provider.NotificationSendResult;
 import com.coach.notification.provider.SmsSender;
+import com.coach.notification.provider.WhatsAppSender;
 import com.coach.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class NotificationService {
     private final NotificationRepository repository;
     private final EmailSender emailSender;
     private final SmsSender smsSender;
+    private final WhatsAppSender whatsAppSender;
 
     public SendNotificationResponse send(String coachEmail, SendNotificationRequest req) {
         Instant now = Instant.now();
@@ -45,9 +47,11 @@ public class NotificationService {
 
         repository.save(notification);
 
-        NotificationSendResult result = dispatch(notification);
+        NotificationSendResult result = dispatch(notification, req);
         notification.setStatus(result.success() ? NotificationStatus.SENT : NotificationStatus.FAILED);
         notification.setErrorMessage(result.errorMessage());
+        notification.setProvider(providerName(notification.getChannel()));
+        notification.setProviderMessageId(result.providerMessageId());
         notification.setUpdatedAt(Instant.now());
         repository.save(notification);
 
@@ -72,7 +76,7 @@ public class NotificationService {
                 .toList();
     }
 
-    private NotificationSendResult dispatch(Notification notification) {
+    private NotificationSendResult dispatch(Notification notification, SendNotificationRequest req) {
         if (notification.getChannel() == NotificationChannel.EMAIL) {
             return emailSender.send(
                     notification.getRecipient(),
@@ -81,7 +85,28 @@ public class NotificationService {
             );
         }
 
+        if (notification.getChannel() == NotificationChannel.WHATSAPP) {
+            return whatsAppSender.send(
+                    notification.getRecipient(),
+                    notification.getMessage(),
+                    normalize(req.imageDataUrl()),
+                    normalize(req.imageFileName()),
+                    normalize(req.documentDataUrl()),
+                    normalize(req.documentFileName()),
+                    notification.getType(),
+                    normalizeTemplateParameters(req.templateParameters())
+            );
+        }
+
         return smsSender.send(notification.getRecipient(), notification.getMessage());
+    }
+
+    private String providerName(NotificationChannel channel) {
+        return switch (channel) {
+            case EMAIL -> "MOCK_EMAIL";
+            case SMS -> "MOCK_SMS";
+            case WHATSAPP -> "WHATSAPP";
+        };
     }
 
     private NotificationResponse toResponse(Notification notification) {
@@ -95,6 +120,8 @@ public class NotificationService {
                 notification.getMessage(),
                 notification.getStatus(),
                 notification.getErrorMessage(),
+                notification.getProvider(),
+                notification.getProviderMessageId(),
                 notification.getCreatedAt(),
                 notification.getUpdatedAt()
         );
@@ -105,5 +132,16 @@ public class NotificationService {
             return null;
         }
         return value.trim();
+    }
+
+    private List<String> normalizeTemplateParameters(List<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+
+        return values.stream()
+                .map(this::normalize)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 }

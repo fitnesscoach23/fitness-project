@@ -35,6 +35,20 @@ jwt:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
+whatsapp:
+  mode: ${WHATSAPP_MODE:mock}
+  api-base-url: ${WHATSAPP_API_BASE_URL:https://graph.facebook.com/v25.0}
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+  template-name: ${WHATSAPP_TEMPLATE_NAME:}
+  template-language-code: ${WHATSAPP_TEMPLATE_LANGUAGE_CODE:en_US}
+  payment-reminder-template-name: ${WHATSAPP_PAYMENT_REMINDER_TEMPLATE_NAME:}
+  checkin-reminder-template-name: ${WHATSAPP_CHECKIN_REMINDER_TEMPLATE_NAME:}
+  progress-comparison-template-name: ${WHATSAPP_PROGRESS_COMPARISON_TEMPLATE_NAME:}
+  consistency-report-template-name: ${WHATSAPP_CONSISTENCY_REPORT_TEMPLATE_NAME:}
+  workout-plan-template-name: ${WHATSAPP_WORKOUT_PLAN_TEMPLATE_NAME:}
+  diet-plan-template-name: ${WHATSAPP_DIET_PLAN_TEMPLATE_NAME:}
+
 ---
 spring:
   config:

@@ -6,5 +6,8 @@ export const environment = {
   dietApi: '',
   checkinApi: '',
   billingApi: '',
-  notificationApi: ''
+  notificationApi: '',
+  checkinFormUrl: 'https://forms.gle/Mr1zs7tmoUguNMyG6',
+  billingUpiId: '9584042542@ybl',
+  billingQrImageUrl: 'assets/billing-upi-qr.png'
 };

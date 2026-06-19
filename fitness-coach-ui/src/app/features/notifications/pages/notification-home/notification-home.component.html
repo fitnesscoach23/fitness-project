@@ -1,7 +1,7 @@
 <div class="notifications-page">
   <section class="hero-card">
     <h1>Notifications</h1>
-    <p>Send Email/SMS notifications and review delivery history.</p>
+    <p>Send Email, SMS, or WhatsApp notifications and review delivery history.</p>
   </section>
 
   <section class="card">
@@ -142,6 +142,8 @@
       <div><label>Channel</label><span>{{ selectedNotification.channel }}</span></div>
       <div><label>Type</label><span>{{ selectedNotification.type }}</span></div>
       <div><label>Status</label><span>{{ selectedNotification.status }}</span></div>
+      <div *ngIf="selectedNotification.provider"><label>Provider</label><span>{{ selectedNotification.provider }}</span></div>
+      <div *ngIf="selectedNotification.providerMessageId"><label>Provider Message ID</label><span>{{ selectedNotification.providerMessageId }}</span></div>
       <div><label>Recipient</label><span>{{ selectedNotification.recipient }}</span></div>
       <div *ngIf="selectedNotification.subject"><label>Subject</label><span>{{ selectedNotification.subject }}</span></div>
       <div><label>Created</label><span>{{ formatDate(selectedNotification.createdAt) }}</span></div>

@@ -452,7 +452,19 @@
   <div class="card billing-shortcut-card">
     <h3 class="card-title">Need to manage billing?</h3>
     <p>Use the central Billing console to create payments, confirm dues, and apply subscription overrides.</p>
-    <button class="primary-btn" routerLink="/billing">Open Billing Console</button>
+    <div class="inline-form">
+      <button class="primary-btn" routerLink="/billing">Open Billing Console</button>
+      <button
+        type="button"
+        class="secondary-btn"
+        [disabled]="sendingPaymentReminderWhatsApp"
+        (click)="sendPaymentReminderWhatsApp()">
+        {{ sendingPaymentReminderWhatsApp ? 'Sending...' : 'Send WhatsApp Reminder' }}
+      </button>
+    </div>
+    <p *ngIf="paymentReminderWhatsAppMessage">
+      {{ paymentReminderWhatsAppMessage }}
+    </p>
   </div>
 
   <div class="card">
@@ -651,9 +663,23 @@
             (click)="captureProgressComparison()">
             {{ capturingComparison ? 'Capturing...' : 'Capture Screenshot' }}
           </button>
+          <button
+            type="button"
+            class="secondary-btn"
+            [disabled]="sendingComparisonWhatsApp"
+            (click)="sendProgressComparisonWhatsApp()">
+            {{ sendingComparisonWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+          </button>
           <button type="button" class="secondary-btn" (click)="closeProgressComparison()">Close</button>
         </div>
       </div>
+
+      <p
+        *ngIf="comparisonWhatsAppMessage"
+        class="comparison-share-status"
+        data-html2canvas-ignore="true">
+        {{ comparisonWhatsAppMessage }}
+      </p>
 
       <div
         class="comparison-zoom-shell"
@@ -792,7 +818,7 @@
         </div>
       </div>
 
-      <div class="comparison-enhancement-panel">
+      <div class="comparison-enhancement-panel" data-html2canvas-ignore="true">
         <div class="comparison-enhancement-heading">
           <span>Most Recent Photo Optimizer</span>
           <button type="button" class="secondary-btn" (click)="resetComparisonEnhancement()">Reset</button>
@@ -907,8 +933,23 @@
             (click)="captureWeeklyReport()">
             {{ capturingWeeklyReport ? 'Exporting...' : 'Export Image' }}
           </button>
+          <button
+            type="button"
+            class="secondary-btn weekly-export-btn"
+            data-html2canvas-ignore="true"
+            [disabled]="sendingWeeklyReportWhatsApp || !currentWeekConsistency"
+            (click)="sendWeeklyReportWhatsApp()">
+            {{ sendingWeeklyReportWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+          </button>
         </div>
       </div>
+
+      <p
+        *ngIf="weeklyReportWhatsAppMessage"
+        class="inline-status"
+        data-html2canvas-ignore="true">
+        {{ weeklyReportWhatsAppMessage }}
+      </p>
 
       <div *ngIf="weeklyConsistencyLoading" class="state compact-state">
         Loading weekly consistency...
@@ -1072,7 +1113,17 @@
       [disabled]="!activeWorkoutPlan">
       Export to Excel
     </button>
+    <button
+      class="secondary-btn"
+      (click)="sendWorkoutPlanWhatsApp()"
+      [disabled]="!activeWorkoutPlan || sendingWorkoutPlanWhatsApp">
+      {{ sendingWorkoutPlanWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+    </button>
   </div>
+
+  <p *ngIf="workoutPlanWhatsAppMessage" class="inline-status">
+    {{ workoutPlanWhatsAppMessage }}
+  </p>
 
   <!-- Active Plan -->
 <div *ngIf="activeWorkoutPlan" class="active-plan">
@@ -1136,6 +1187,39 @@
       [disabled]="!dietPlan">
       Export to Excel
     </button>
+  </div>
+
+  <div class="diet-whatsapp-panel">
+    <div class="diet-whatsapp-head">
+      <div>
+        <h4>WhatsApp Diet Message</h4>
+        <p>Write the diet note exactly as you want the member to receive it.</p>
+      </div>
+      <div class="diet-whatsapp-actions">
+        <button
+          type="button"
+          class="secondary-btn"
+          (click)="saveDietWhatsAppMessage()">
+          Save
+        </button>
+        <button
+          type="button"
+          class="primary-btn"
+          [disabled]="sendingDietWhatsApp || !dietWhatsAppMessageText.trim()"
+          (click)="sendDietPlanWhatsApp()">
+          {{ sendingDietWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+        </button>
+      </div>
+    </div>
+
+    <textarea
+      rows="8"
+      [(ngModel)]="dietWhatsAppMessageText"
+      placeholder="Write diet plan message here"></textarea>
+
+    <p *ngIf="dietWhatsAppStatus" class="inline-status">
+      {{ dietWhatsAppStatus }}
+    </p>
   </div>
 
   <div *ngIf="dietPlan">
