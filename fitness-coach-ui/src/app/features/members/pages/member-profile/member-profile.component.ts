@@ -934,7 +934,6 @@ removeMeasurement(index: number) {
     next: (res: any) => {
       this.member = res;
       this.initializeBodyMetrics();
-      this.loadSavedDietWhatsAppMessage();
       this.loadSubscriptionOverride();
       this.loading = false;
       this.loadSubscription();
@@ -1887,11 +1886,13 @@ loadDiet() {
     next: res => {
       this.dietPlan = res;
       this.refreshDietPlanViewModel();
+      this.loadSavedDietWhatsAppMessage();
       this.dietLoading = false;
     },
     error: () => {
       this.dietPlan = null;
       this.refreshDietPlanViewModel();
+      this.loadSavedDietWhatsAppMessage();
       this.dietLoading = false;
     }
   });
@@ -1912,6 +1913,11 @@ saveDietWhatsAppMessage(): void {
     this.dietWhatsAppMessageText.trim()
   );
   this.dietWhatsAppStatus = 'Diet message saved.';
+}
+
+generateDietWhatsAppMessage(): void {
+  this.dietWhatsAppMessageText = this.getDefaultDietWhatsAppMessage();
+  this.dietWhatsAppStatus = 'Diet message generated from current plan.';
 }
 
 sendDietPlanWhatsApp(): void {
@@ -1960,7 +1966,150 @@ private getDietWhatsAppStorageKey(memberId: string): string {
 
 private getDefaultDietWhatsAppMessage(): string {
   const name = this.member?.fullName || 'Member';
-  return `🥗 Diet Plan for ${name}\n\n💧 Hydration First\nDrink plenty of water throughout the day 🚰\nAim for at least 2.5-3 litres daily`;
+  const sections: string[] = [
+    `🥗 Diet Plan for ${name}`,
+    `💧 Hydration First\n\nDrink plenty of water throughout the day 🚰\n\nAim for at least 4 litres daily`
+  ];
+
+  const mealSections = this.groupedDietMeals
+    .filter((meal) => meal.items?.length)
+    .map((meal) => this.buildDietWhatsAppMealSection(meal));
+
+  if (mealSections.length) {
+    sections.push(...mealSections);
+  } else if (this.dietPlan?.notes?.trim()) {
+    sections.push(this.dietPlan.notes.trim());
+  }
+
+  sections.push(this.buildDietWhatsAppNutritionSection());
+  sections.push(this.buildDietWhatsAppFinalNotes());
+  sections.push(this.buildDietWhatsAppQuickRules());
+
+  return sections.filter(Boolean).join('\n\n');
+}
+
+private buildDietWhatsAppMealSection(meal: DietMealViewModel): string {
+  const mealName = String(meal.mealName || 'Meal').trim();
+  const items = meal.items || [];
+  const lines: string[] = [];
+
+  for (const item of items) {
+    const primaryLine = this.formatDietWhatsAppFoodLine(item.displayFoodName || item.foodName, item);
+    if (primaryLine) {
+      lines.push(primaryLine);
+    }
+
+    for (const alternative of item.optionalAlternatives || []) {
+      const alternativeLine = this.formatDietWhatsAppFoodLine(alternative, item);
+      if (alternativeLine) {
+        lines.push(alternativeLine);
+      }
+    }
+  }
+
+  const hasAlternatives = items.some((item) => item.optionalAlternatives?.length);
+  const intro = hasAlternatives ? '\n\nChoose one option 👇\n' : '';
+
+  return `${this.getDietMealIcon(mealName)} ${mealName}${intro}\n${lines.join('\n')}`.trim();
+}
+
+private formatDietWhatsAppFoodLine(foodName: string, item: any): string {
+  const food = String(foodName || '').trim();
+  if (!food) return '';
+
+  const quantity = this.formatDietWhatsAppQuantity(item);
+  return `${this.getDietFoodIcon(food)} ${quantity ? `${quantity} ` : ''}${food}`.trim();
+}
+
+private formatDietWhatsAppQuantity(item: any): string {
+  const quantity = item?.quantity ?? '';
+  const unit = String(item?.unit || '').trim();
+
+  if (quantity === '' || quantity == null) {
+    return '';
+  }
+
+  return `${quantity}${unit}`.replace(/\s+/g, ' ').trim();
+}
+
+private buildDietWhatsAppNutritionSection(): string {
+  const totals = this.dietPlanTotals;
+
+  return [
+    '📊 Daily Nutrition',
+    '',
+    `🔥 Calories: ${this.formatDietMacro(totals.calories, 'kcal')}`,
+    `🥩 Protein: ${this.formatDietMacro(totals.protein, 'g')}`,
+    `🍚 Carbohydrates: ${this.formatDietMacro(totals.carbs, 'g')}`,
+    `🥜 Fats: ${this.formatDietMacro(totals.fats, 'g')}`
+  ].join('\n');
+}
+
+private buildDietWhatsAppFinalNotes(): string {
+  return [
+    '💬 Final Notes',
+    '',
+    '✨ Include a protein source in every main meal',
+    '✨ Maintain portion accuracy',
+    '✨ Hit daily step target consistently',
+    '✨ Recover well 💪',
+    '',
+    '👉 Consistency > Perfection 🚀'
+  ].join('\n');
+}
+
+private buildDietWhatsAppQuickRules(): string {
+  return [
+    '⚡ Quick Rules',
+    '',
+    '✔️ 60g Rice = 60g Wheat Flour = 60g Daliya',
+    '✔️ 2 Brown Bread ≈ 60g Rice',
+    '✔️ 50g Dal ≈ 50g Rajma ≈ 50g Chole',
+    '✔️ 100g Chicken Breast ≈ 6 Egg Whites ≈ 50g Soya Chunks',
+    '✔️ 100g Paneer ≈ 3 Whole Eggs',
+    '✔️ Total Oil Intake ≈ 15g/day',
+    '✔️ 1 Apple ≈ 1 Banana ≈ 100-120g Mango ≈ 150g Papaya ≈ 250-300g Watermelon ≈ 150g Pineapple'
+  ].join('\n');
+}
+
+private formatDietMacro(value: number | null, suffix: string): string {
+  if (value == null || !Number.isFinite(Number(value))) {
+    return '-';
+  }
+
+  return `${value} ${suffix}`;
+}
+
+private getDietMealIcon(mealName: string): string {
+  const value = mealName.toLowerCase();
+  if (value.includes('pre')) return '☕';
+  if (value.includes('breakfast')) return '🌅';
+  if (value.includes('lunch')) return '🍛';
+  if (value.includes('snack') || value.includes('evening')) return '☕';
+  if (value.includes('dinner')) return '🌙';
+  return '🥗';
+}
+
+private getDietFoodIcon(foodName: string): string {
+  const value = foodName.toLowerCase();
+  if (value.includes('coffee')) return '☕';
+  if (value.includes('apple')) return '🍎';
+  if (value.includes('banana')) return '🍌';
+  if (value.includes('mango')) return '🥭';
+  if (value.includes('pineapple')) return '🍍';
+  if (value.includes('watermelon')) return '🍉';
+  if (value.includes('egg')) return '🥚';
+  if (value.includes('chicken')) return '🍗';
+  if (value.includes('rice')) return '🍚';
+  if (value.includes('roti') || value.includes('wheat') || value.includes('flour')) return '🫓';
+  if (value.includes('dal') || value.includes('rajma') || value.includes('chole')) return '🥘';
+  if (value.includes('curd') || value.includes('oats') || value.includes('poha') || value.includes('upma')) return '🥣';
+  if (value.includes('paneer')) return '🧀';
+  if (value.includes('spinach')) return '🥬';
+  if (value.includes('vegetable')) return '🥗';
+  if (value.includes('oil')) return '🫒';
+  if (value.includes('almond') || value.includes('cashew') || value.includes('nut')) return '🌰';
+  return '•';
 }
 
 goToCreateDiet() {

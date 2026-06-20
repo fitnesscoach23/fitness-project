@@ -94,8 +94,8 @@
     <div class="smart-panel">
       <div class="smart-panel-head">
         <div class="section-head">
-          <h2>Attention Center</h2>
-          <p>Switch between progress check-ins and billing without stretching the dashboard.</p>
+          <h2>Member Focus</h2>
+          <p>Review one member at a time, with reminder tools kept out of the way.</p>
         </div>
 
         <div class="smart-tabs" role="tablist" aria-label="Dashboard attention sections">
@@ -243,72 +243,81 @@
               </div>
             </div>
 
-            <div class="snapshot-share-actions">
-              <button
-                type="button"
-                class="primary-action"
-                [disabled]="sendingCheckinWhatsApp"
-                (click)="sendCheckinReminderWhatsApp()">
-                {{ sendingCheckinWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
-              </button>
-              <button type="button" class="primary-action" (click)="downloadCheckinReminderScreenshot()">
-                Download Screenshot
-              </button>
-              <button type="button" class="secondary-action" (click)="openCheckinReminderInGmail()">
-                Open Gmail
-              </button>
-              <button type="button" class="secondary-action" (click)="copyCheckinReminderMessage()">
-                Copy Message
-              </button>
-              <span *ngIf="checkinShareStatus">{{ checkinShareStatus }}</span>
-            </div>
+            <details class="dashboard-tools-panel">
+              <summary>
+                <span>Reminder tools</span>
+                <strong>{{ selectedCheckinMember.cadenceConfigured ? getCheckinDueLabel(selectedCheckinMember.daysUntilDue) : 'Setup needed' }}</strong>
+              </summary>
 
-            <div
-              #checkinReminderSnapshot
-              class="checkin-reminder-snapshot compact-snapshot"
-              [class.overdue-snapshot]="selectedCheckinMember.cadenceConfigured && selectedCheckinMember.daysUntilDue <= 0"
-              [class.setup-snapshot]="!selectedCheckinMember.cadenceConfigured">
-              <div class="snapshot-top">
-                <div>
-                  <div class="snapshot-eyebrow checkin-eyebrow">
-                    {{ getCheckinReminderTitle(selectedCheckinMember) }}
+              <div class="dashboard-tools-content">
+                <div class="snapshot-share-actions">
+                  <button
+                    type="button"
+                    class="primary-action"
+                    [disabled]="sendingCheckinWhatsApp"
+                    (click)="sendCheckinReminderWhatsApp()">
+                    {{ sendingCheckinWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+                  </button>
+                  <button type="button" class="primary-action" (click)="downloadCheckinReminderScreenshot()">
+                    Download Screenshot
+                  </button>
+                  <button type="button" class="secondary-action" (click)="openCheckinReminderInGmail()">
+                    Open Gmail
+                  </button>
+                  <button type="button" class="secondary-action" (click)="copyCheckinReminderMessage()">
+                    Copy Message
+                  </button>
+                  <span *ngIf="checkinShareStatus">{{ checkinShareStatus }}</span>
+                </div>
+
+                <div
+                  #checkinReminderSnapshot
+                  class="checkin-reminder-snapshot compact-snapshot"
+                  [class.overdue-snapshot]="selectedCheckinMember.cadenceConfigured && selectedCheckinMember.daysUntilDue <= 0"
+                  [class.setup-snapshot]="!selectedCheckinMember.cadenceConfigured">
+                  <div class="snapshot-top">
+                    <div>
+                      <div class="snapshot-eyebrow checkin-eyebrow">
+                        {{ getCheckinReminderTitle(selectedCheckinMember) }}
+                      </div>
+                      <h3>{{ selectedCheckinMember.fullName }}</h3>
+                      <p>{{ selectedCheckinMember.email }}</p>
+                      <p *ngIf="selectedCheckinMember.phone">{{ selectedCheckinMember.phone }}</p>
+                    </div>
                   </div>
-                  <h3>{{ selectedCheckinMember.fullName }}</h3>
-                  <p>{{ selectedCheckinMember.email }}</p>
-                  <p *ngIf="selectedCheckinMember.phone">{{ selectedCheckinMember.phone }}</p>
-                </div>
-              </div>
 
-              <div class="checkin-reminder-status">
-                <span>Check-in Status</span>
-                <strong>
-                  {{ selectedCheckinMember.cadenceConfigured ? getCheckinDueLabel(selectedCheckinMember.daysUntilDue) : 'Cadence needed' }}
-                </strong>
-              </div>
+                  <div class="checkin-reminder-status">
+                    <span>Check-in Status</span>
+                    <strong>
+                      {{ selectedCheckinMember.cadenceConfigured ? getCheckinDueLabel(selectedCheckinMember.daysUntilDue) : 'Cadence needed' }}
+                    </strong>
+                  </div>
 
-              <div class="snapshot-grid">
-                <div>
-                  <span>Last Check-in</span>
-                  <strong>{{ formatDate(selectedCheckinMember.lastCheckinDate) }}</strong>
-                </div>
-                <div>
-                  <span>Next Due</span>
-                  <strong>{{ formatDate(selectedCheckinMember.nextCheckinDate) }}</strong>
-                </div>
-                <div>
-                  <span>Cadence</span>
-                  <strong>{{ getCheckinCadenceLabel(selectedCheckinMember) }}</strong>
-                </div>
-                <div>
-                  <span>Total Logged</span>
-                  <strong>{{ selectedCheckinMember.checkinCount }}</strong>
-                </div>
-              </div>
+                  <div class="snapshot-grid">
+                    <div>
+                      <span>Last Check-in</span>
+                      <strong>{{ formatDate(selectedCheckinMember.lastCheckinDate) }}</strong>
+                    </div>
+                    <div>
+                      <span>Next Due</span>
+                      <strong>{{ formatDate(selectedCheckinMember.nextCheckinDate) }}</strong>
+                    </div>
+                    <div>
+                      <span>Cadence</span>
+                      <strong>{{ getCheckinCadenceLabel(selectedCheckinMember) }}</strong>
+                    </div>
+                    <div>
+                      <span>Total Logged</span>
+                      <strong>{{ selectedCheckinMember.checkinCount }}</strong>
+                    </div>
+                  </div>
 
-              <div class="snapshot-note checkin-reminder-note">
-                {{ getCheckinReminderMessage(selectedCheckinMember) }}
+                  <div class="snapshot-note checkin-reminder-note">
+                    {{ getCheckinReminderMessage(selectedCheckinMember) }}
+                  </div>
+                </div>
               </div>
-            </div>
+            </details>
           </div>
         </div>
 
@@ -350,41 +359,6 @@
         </div>
 
         <div class="billing-detail-stack" *ngIf="selectedDueMember">
-          <div class="snapshot-editor">
-            <label>
-              Pending Amount
-              <input type="number" min="0" [(ngModel)]="snapshotDraftAmount" />
-            </label>
-            <label>
-              Renewal Date
-              <input type="date" [(ngModel)]="snapshotDraftRenewalDate" />
-            </label>
-            <div class="snapshot-editor-actions">
-              <button type="button" class="primary-action" (click)="saveSnapshotEdits()">Save</button>
-              <button type="button" class="secondary-action" (click)="resetSnapshotEdits()">Reset</button>
-            </div>
-          </div>
-
-          <div class="snapshot-share-actions">
-            <button
-              type="button"
-              class="primary-action"
-              [disabled]="sendingBillingWhatsApp"
-              (click)="sendBillingReminderWhatsApp()">
-              {{ sendingBillingWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
-            </button>
-            <button type="button" class="primary-action" (click)="downloadBillingScreenshot()">
-              Download Screenshot
-            </button>
-            <button type="button" class="secondary-action" (click)="openBillingReminderInGmail()">
-              Open Gmail
-            </button>
-            <button type="button" class="secondary-action" (click)="copyBillingReminderMessage()">
-              Copy Message
-            </button>
-            <span *ngIf="billingShareStatus">{{ billingShareStatus }}</span>
-          </div>
-
           <div
             #billingSnapshot
             class="billing-snapshot compact-snapshot"
@@ -447,6 +421,50 @@
               <span *ngIf="billingUpiId">UPI ID: {{ billingUpiId }}.</span>
             </div>
           </div>
+
+          <details class="dashboard-tools-panel">
+            <summary>
+              <span>Billing tools</span>
+              <strong>{{ getBillingAttentionLabel(selectedDueMember.daysRemaining) }}</strong>
+            </summary>
+
+            <div class="dashboard-tools-content">
+              <div class="snapshot-editor">
+                <label>
+                  Pending Amount
+                  <input type="number" min="0" [(ngModel)]="snapshotDraftAmount" />
+                </label>
+                <label>
+                  Renewal Date
+                  <input type="date" [(ngModel)]="snapshotDraftRenewalDate" />
+                </label>
+                <div class="snapshot-editor-actions">
+                  <button type="button" class="primary-action" (click)="saveSnapshotEdits()">Save</button>
+                  <button type="button" class="secondary-action" (click)="resetSnapshotEdits()">Reset</button>
+                </div>
+              </div>
+
+              <div class="snapshot-share-actions">
+                <button
+                  type="button"
+                  class="primary-action"
+                  [disabled]="sendingBillingWhatsApp"
+                  (click)="sendBillingReminderWhatsApp()">
+                  {{ sendingBillingWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+                </button>
+                <button type="button" class="primary-action" (click)="downloadBillingScreenshot()">
+                  Download Screenshot
+                </button>
+                <button type="button" class="secondary-action" (click)="openBillingReminderInGmail()">
+                  Open Gmail
+                </button>
+                <button type="button" class="secondary-action" (click)="copyBillingReminderMessage()">
+                  Copy Message
+                </button>
+                <span *ngIf="billingShareStatus">{{ billingShareStatus }}</span>
+              </div>
+            </div>
+          </details>
         </div>
 
         <div class="billing-empty-detail" *ngIf="!selectedDueMember">

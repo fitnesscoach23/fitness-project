@@ -149,7 +149,7 @@ public class WhatsAppSenderImpl implements WhatsAppSender {
 
         components.add(Map.of(
                 "type", "body",
-                "parameters", buildBodyParameters(message, templateParameters)
+                "parameters", buildBodyParameters(message, templateParameters, type)
         ));
 
         return client.post()
@@ -311,20 +311,23 @@ public class WhatsAppSenderImpl implements WhatsAppSender {
 
     private boolean shouldSendTemplate(NotificationType type) {
         if (type == NotificationType.DIET_PLAN) {
-            return StringUtils.hasText(properties.dietPlanTemplateName())
-                    || StringUtils.hasText(properties.templateName());
+            return false;
         }
 
         return properties.templateMode();
     }
 
-    private List<Map<String, Object>> buildBodyParameters(String message, List<String> templateParameters) {
+    private List<Map<String, Object>> buildBodyParameters(
+            String message,
+            List<String> templateParameters,
+            NotificationType type
+    ) {
         List<String> values = templateParameters == null || templateParameters.isEmpty()
                 ? List.of(message)
                 : templateParameters;
 
         return values.stream()
-                .map(this::sanitizeTemplateText)
+                .map(value -> sanitizeTemplateText(value, type))
                 .map(text -> Map.<String, Object>of(
                         "type", "text",
                         "text", text
@@ -355,7 +358,7 @@ public class WhatsAppSenderImpl implements WhatsAppSender {
         return StringUtils.hasText(primary) ? primary : fallback;
     }
 
-    private String sanitizeTemplateText(String value) {
+    private String sanitizeTemplateText(String value, NotificationType type) {
         if (!StringUtils.hasText(value)) {
             return "-";
         }
