@@ -904,7 +904,7 @@
         <div>
           <h3 class="card-title">Weekly Consistency</h3>
           <p class="weekly-consistency-subtitle">
-            {{ member?.fullName }} - {{ currentWeekConsistency?.rangeLabel || 'Current week' }}
+            {{ member?.fullName }} - Week: {{ currentWeekConsistency?.rangeLabel || 'Current week' }}
           </p>
         </div>
         <div class="weekly-header-actions">
@@ -964,13 +964,13 @@
         class="weekly-consistency-grid">
         <div class="week-score-panel" *ngIf="currentWeekConsistency as current" [ngClass]="current.ratingClass">
           <div class="week-score-label">{{ current.label }}</div>
-          <div class="week-score-range">{{ current.rangeLabel }}</div>
+          <div class="week-score-range">Week: {{ current.rangeLabel }}</div>
           <div class="week-score-value">{{ current.score }}</div>
           <div class="week-score-rating">{{ current.rating }}</div>
 
-          <div class="week-score-metrics">
-            <div>
-              <label>Workout Compliance</label>
+            <div class="week-score-metrics">
+              <div>
+                <label>Workout Compliance</label>
               <span>
                 {{ current.workoutCompliance | number:'1.0-0' }}%
                 ({{ current.completedWorkouts }}/{{ current.plannedWorkouts }} workouts)
@@ -989,18 +989,22 @@
             <div class="weekly-progress-track">
               <span [style.width.%]="current.stepsCompliance"></span>
             </div>
+            <div>
+              <label>Active Days</label>
+              <span>{{ current.activeDays }}/{{ current.trackedDays }} days</span>
+            </div>
           </div>
         </div>
 
         <div class="week-score-panel muted-panel" *ngIf="previousWeekConsistency as previous" [ngClass]="previous.ratingClass">
           <div class="week-score-label">{{ previous.label }}</div>
-          <div class="week-score-range">{{ previous.rangeLabel }}</div>
+          <div class="week-score-range">Week: {{ previous.rangeLabel }}</div>
           <div class="week-score-value">{{ previous.score }}</div>
           <div class="week-score-rating">{{ previous.rating }}</div>
 
-          <div class="week-score-metrics">
-            <div>
-              <label>Workout Compliance</label>
+            <div class="week-score-metrics">
+              <div>
+                <label>Workout Compliance</label>
               <span>
                 {{ previous.workoutCompliance | number:'1.0-0' }}%
                 ({{ previous.completedWorkouts }}/{{ previous.plannedWorkouts }} workouts)
@@ -1018,6 +1022,10 @@
             </div>
             <div class="weekly-progress-track">
               <span [style.width.%]="previous.stepsCompliance"></span>
+            </div>
+            <div>
+              <label>Active Days</label>
+              <span>{{ previous.activeDays }}/{{ previous.trackedDays }} days</span>
             </div>
           </div>
         </div>
@@ -1039,6 +1047,10 @@
           <div>
             <label>Step Target</label>
             <span>{{ current.stepTarget ? (current.stepTarget | number) : '-' }}</span>
+          </div>
+          <div>
+            <label>Active Days</label>
+            <span>{{ current.activeDays }} / {{ current.trackedDays }}</span>
           </div>
           <div>
             <label>Trend</label>
@@ -1090,6 +1102,37 @@
           <ng-template #noManualFeedback>
             <p class="manual-feedback-placeholder">Coach feedback will be added here.</p>
           </ng-template>
+        </div>
+      </div>
+
+      <div
+        *ngIf="!weeklyConsistencyLoading && !weeklyConsistencyError"
+        class="weekly-formula-panel"
+        data-html2canvas-ignore="true">
+        <div class="weekly-summary-title">Coach Follow-Up</div>
+        <div>
+          <label>Status</label>
+          <span>{{ followUpStatusLabel }}</span>
+        </div>
+        <div>
+          <label>Last Activity Date</label>
+          <span>{{ lastActivityDateLabel }}</span>
+        </div>
+        <div>
+          <label>Days Since Activity</label>
+          <span>{{ daysSinceActivityLabel }}</span>
+        </div>
+        <button
+          type="button"
+          class="secondary-btn regenerate-feedback-btn"
+          (click)="generateFollowUpMessage()">
+          Generate Follow-Up Message
+        </button>
+        <div class="manual-feedback-editor" *ngIf="followUpMessageDraft">
+          <textarea
+            rows="4"
+            [(ngModel)]="followUpMessageDraft"
+            placeholder="Generated follow-up message"></textarea>
         </div>
       </div>
     </div>

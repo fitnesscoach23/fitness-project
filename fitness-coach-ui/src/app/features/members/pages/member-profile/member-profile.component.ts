@@ -56,6 +56,7 @@ type DietMealViewModel = {
   items: DietItemViewModel[];
 };
 export type WeeklyConsistencyTrend = 'improving' | 'declining' | 'stable';
+type FollowUpStatus = 'ON_TRACK' | 'NEEDS_CHECK_IN' | 'RE_ENGAGEMENT_NEEDED';
 type WeeklyScoreRating = {
   label: string;
   color: string;
@@ -66,6 +67,8 @@ type WeeklyConsistencyScore = {
   rangeLabel: string;
   completedWorkouts: number;
   plannedWorkouts: number;
+  activeDays: number;
+  trackedDays: number;
   averageDailySteps: number;
   stepTarget: number;
   workoutCompliance: number;
@@ -128,6 +131,9 @@ export class MemberProfileComponent implements OnInit {
   weeklyConsistencyTrend: WeeklyConsistencyTrend = 'stable';
   weeklyScoreDifference = 0;
   weeklyManualFeedback = '';
+  lastActivityDate: string | null = null;
+  daysSinceActivity: number | null = null;
+  followUpMessageDraft = '';
   private weeklyFeedbackManuallyEdited = false;
   capturingWeeklyReport = false;
   sendingPaymentReminderWhatsApp = false;
@@ -1530,12 +1536,15 @@ loadWeeklyConsistency() {
   if (!this.member?.id) return;
 
   const today = this.startOfDay(new Date());
-  const currentWeekStart = this.getWeekStart(today);
+  const currentWeekStart = this.getReportWeekStart(today);
+  const currentWeekEnd = this.addDays(currentWeekStart, 6);
   const previousWeekStart = this.addDays(currentWeekStart, -7);
   const previousWeekEnd = this.addDays(currentWeekStart, -1);
+  const activityLookbackStart = this.addDays(today, -60);
   const ranges = [
-    { start: currentWeekStart, end: today },
-    { start: previousWeekStart, end: previousWeekEnd }
+    { start: currentWeekStart, end: currentWeekEnd },
+    { start: previousWeekStart, end: previousWeekEnd },
+    { start: activityLookbackStart, end: today }
   ];
   const monthKeys = Array.from(new Set(
     ranges.flatMap((range) => this.getMonthKeysBetween(range.start, range.end))
@@ -1551,7 +1560,7 @@ loadWeeklyConsistency() {
         this.currentWeekConsistency = this.buildWeeklyConsistencyScore(
           'Current week',
           currentWeekStart,
-          today,
+          currentWeekEnd,
           days
         );
         this.previousWeekConsistency = this.buildWeeklyConsistencyScore(
@@ -1568,12 +1577,15 @@ loadWeeklyConsistency() {
           this.currentWeekConsistency?.score,
           this.previousWeekConsistency?.score
         );
+        this.updateActivityFollowUp(days, today);
         this.syncGeneratedCoachFeedback();
         this.weeklyConsistencyLoading = false;
       },
       error: () => {
         this.currentWeekConsistency = null;
         this.previousWeekConsistency = null;
+        this.lastActivityDate = null;
+        this.daysSinceActivity = null;
         this.weeklyConsistencyLoading = false;
         this.weeklyConsistencyError = 'Failed to load weekly consistency';
       }
@@ -1590,6 +1602,7 @@ private buildWeeklyConsistencyScore(
   const entriesByDate = new Map(days.map((day) => [day.checkInDate, day]));
   const weekEntries = dateKeys.map((date) => entriesByDate.get(date) || null);
   const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
+  const activeDays = weekEntries.filter((entry) => this.isActiveDailyEntry(entry)).length;
   const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
   const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
   const plannedWorkouts = this.getPlannedWorkoutsPerWeek();
@@ -1604,6 +1617,8 @@ private buildWeeklyConsistencyScore(
     rangeLabel: `${this.formatShortDate(start)} - ${this.formatShortDate(end)}`,
     completedWorkouts,
     plannedWorkouts,
+    activeDays,
+    trackedDays: dateKeys.length,
     averageDailySteps: this.roundTo(averageDailySteps, 0),
     stepTarget,
     workoutCompliance: this.roundTo(workoutCompliance, 1),
@@ -1683,11 +1698,11 @@ generateNextWeekFocus(week: WeeklyConsistencyScore | null = this.currentWeekCons
   if (!week) return 'Review consistency once this week has check-ins.';
 
   if (week.workoutCompliance < 80 && week.stepsCompliance < 80) {
-    return 'Complete workouts and hit step target more consistently.';
+    return 'Build consistent activity with planned workouts, steps, or suitable alternatives.';
   }
 
   if (week.workoutCompliance >= 90 && week.stepsCompliance >= 90) {
-    return 'Maintain the same consistency next week.';
+    return 'Maintain the same engagement rhythm next week.';
   }
 
   if (week.workoutCompliance < week.stepsCompliance) {
@@ -1695,15 +1710,77 @@ generateNextWeekFocus(week: WeeklyConsistencyScore | null = this.currentWeekCons
   }
 
   if (week.stepsCompliance < week.workoutCompliance) {
-    return 'Improve daily step consistency.';
+    return 'Improve daily movement consistency.';
   }
 
-  return 'Keep workouts and steps consistent next week.';
+  return 'Keep overall activity consistent next week.';
 }
 
 getMissedWorkouts(week: WeeklyConsistencyScore | null = this.currentWeekConsistency): number {
   if (!week) return 0;
   return Math.max(0, week.plannedWorkouts - week.completedWorkouts);
+}
+
+get followUpStatus(): FollowUpStatus {
+  const days = this.daysSinceActivity;
+  if (days == null) return 'RE_ENGAGEMENT_NEEDED';
+  if (days < 4) return 'ON_TRACK';
+  if (days <= 6) return 'NEEDS_CHECK_IN';
+  return 'RE_ENGAGEMENT_NEEDED';
+}
+
+get followUpStatusLabel(): string {
+  if (this.followUpStatus === 'NEEDS_CHECK_IN') return 'Needs Check-In';
+  if (this.followUpStatus === 'RE_ENGAGEMENT_NEEDED') return 'Re-engagement Needed';
+  return 'On Track';
+}
+
+get followUpStatusClass(): string {
+  if (this.followUpStatus === 'NEEDS_CHECK_IN') return 'needs-check-in';
+  if (this.followUpStatus === 'RE_ENGAGEMENT_NEEDED') return 're-engagement-needed';
+  return 'on-track';
+}
+
+get lastActivityDateLabel(): string {
+  if (!this.lastActivityDate) return 'No activity in the last 60 days';
+  return this.formatShortDate(this.parseDateKey(this.lastActivityDate));
+}
+
+get daysSinceActivityLabel(): string {
+  if (this.daysSinceActivity == null) return '60+';
+  if (this.daysSinceActivity === 0) return 'Today';
+  return `${this.daysSinceActivity} day${this.daysSinceActivity === 1 ? '' : 's'}`;
+}
+
+generateFollowUpMessage(): void {
+  const firstName = this.getFirstName(this.member?.fullName || 'there');
+  const lastActivity = this.lastActivityDate
+    ? `I noticed your last logged activity was on ${this.lastActivityDateLabel}.`
+    : 'I noticed we have not had a recent activity update logged.';
+
+  if (this.followUpStatus === 'ON_TRACK') {
+    this.followUpMessageDraft = [
+      `Hi ${firstName}, great job staying engaged with the plan.`,
+      'Keep the rhythm simple: movement, recovery, and consistency all count.',
+      'Share today\'s update when you can so I can keep guiding you well.'
+    ].join(' ');
+    return;
+  }
+
+  if (this.followUpStatus === 'NEEDS_CHECK_IN') {
+    this.followUpMessageDraft = [
+      `Hi ${firstName}, just checking in.`,
+      lastActivity,
+      'No pressure if the week has been busy. Send me a quick update on what got in the way, and we can adjust the next step to something manageable.'
+    ].join(' ');
+    return;
+  }
+
+  this.followUpMessageDraft = [
+    `Hi ${firstName}, wanted to reconnect and help you restart gently.`,
+    lastActivity,
+    'Let us keep it simple today: even a short walk, recovery session, or travel-friendly workout counts. Reply with what feels realistic, and I will help you get momentum back.'
+  ].join(' ');
 }
 
 generateCoachFeedback(
@@ -1773,11 +1850,49 @@ private syncGeneratedCoachFeedback(): void {
   this.weeklyManualFeedback = this.generateCoachFeedback();
 }
 
-private getWeekStart(value: Date): Date {
+private updateActivityFollowUp(days: DailyCheckinDay[], today: Date): void {
+  const activeEntries = (days || [])
+    .filter((entry) => this.isActiveDailyEntry(entry))
+    .sort((a, b) => b.checkInDate.localeCompare(a.checkInDate));
+  const latest = activeEntries[0] || null;
+
+  this.lastActivityDate = latest?.checkInDate || null;
+  this.daysSinceActivity = this.lastActivityDate
+    ? this.getDaysBetween(this.parseDateKey(this.lastActivityDate), today)
+    : null;
+  this.followUpMessageDraft = '';
+}
+
+private isActiveDailyEntry(entry: DailyCheckinDay | null): boolean {
+  if (!entry) return false;
+  return Boolean(
+    entry.exerciseDone
+    || entry.stepTargetAchieved
+    || entry.travelWorkout
+    || entry.recoveryDay
+    || entry.activeOther
+  );
+}
+
+private parseDateKey(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+private getDaysBetween(start: Date, end: Date): number {
+  const startMs = this.startOfDay(start).getTime();
+  const endMs = this.startOfDay(end).getTime();
+  return Math.max(0, Math.floor((endMs - startMs) / 86400000));
+}
+
+private getReportWeekStart(value: Date): Date {
+  const sundayStart = this.getSundayWeekStart(value);
+  return value.getDay() === 0 ? this.addDays(sundayStart, -7) : sundayStart;
+}
+
+private getSundayWeekStart(value: Date): Date {
   const date = this.startOfDay(value);
-  const day = date.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  return this.addDays(date, mondayOffset);
+  return this.addDays(date, -date.getDay());
 }
 
 private startOfDay(value: Date): Date {

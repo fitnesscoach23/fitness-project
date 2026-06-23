@@ -2,7 +2,7 @@
   <div class="daily-checkin-toolbar">
     <div>
       <h3 class="section-title">Daily Consistency</h3>
-      <p class="section-subtitle">Manual exercise and steps tracking for the selected month.</p>
+      <p class="section-subtitle">Supportive engagement tracking across workouts, steps, recovery, travel, and other activity.</p>
     </div>
 
     <div class="month-controls">
@@ -39,7 +39,7 @@
     <div class="bulk-update-header">
       <div>
         <h4>Bulk Update Records</h4>
-        <p>Select a date range and mark daily records as active or inactive.</p>
+        <p>Select a date range and add or remove one activity marker.</p>
       </div>
       <div class="bulk-count">{{ bulkSelectedDaysCount }} days selected</div>
     </div>
@@ -56,12 +56,34 @@
       </div>
 
       <div class="editor-field">
-        <label>Status</label>
-        <select [(ngModel)]="bulkEditor.status">
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
+        <label>Marker</label>
+        <select [(ngModel)]="bulkEditor.marker">
+          <option *ngFor="let marker of activityMarkers" [ngValue]="marker.key">
+            {{ marker.label }}
+          </option>
         </select>
       </div>
+
+      <div class="editor-field">
+        <label>Action</label>
+        <select [(ngModel)]="bulkEditor.value">
+          <option [ngValue]="true">Add marker</option>
+          <option [ngValue]="false">Remove marker</option>
+        </select>
+      </div>
+
+      <label class="bulk-checkbox">
+        <input type="checkbox" [(ngModel)]="bulkEditor.noWorkout" />
+        No Workout
+      </label>
+
+      <label class="bulk-checkbox">
+        <input
+          type="checkbox"
+          [(ngModel)]="bulkEditor.noSteps"
+          (ngModelChange)="bulkEditor.stepsCount = bulkEditor.noSteps ? 0 : bulkEditor.stepsCount" />
+        No Steps
+      </label>
 
       <div class="editor-field">
         <label>Steps Count</label>
@@ -69,7 +91,7 @@
           type="number"
           min="0"
           [(ngModel)]="bulkEditor.stepsCount"
-          [disabled]="bulkEditor.status === 'INACTIVE'"
+          [disabled]="bulkEditor.noSteps"
           placeholder="Keep existing or 0" />
       </div>
     </div>
@@ -113,8 +135,9 @@
 
       <div class="calendar-legend">
         <span><i class="legend-dot no-entry"></i>No entry</span>
-        <span><i class="legend-dot inactive-day"></i>Recorded inactive</span>
-        <span><i class="legend-dot active-day"></i>Active day</span>
+        <span *ngFor="let marker of activityMarkers">
+          <i class="legend-dot" [ngClass]="marker.className"></i>{{ marker.label }}
+        </span>
       </div>
 
       <div class="calendar-grid weekday-grid">
@@ -130,13 +153,15 @@
           [disabled]="!cell.inMonth"
           (click)="selectDay(cell)">
           <span class="day-number">{{ cell.dayNumber || '' }}</span>
-          <span class="day-state" *ngIf="cell.entry">
-            {{ cell.entry.active ? 'Active' : 'Inactive' }}
+          <span
+            class="day-state"
+            *ngFor="let marker of getEntryMarkers(cell.entry)"
+            [ngClass]="marker.className">
+            {{ marker.label }}
           </span>
           <span class="day-steps" *ngIf="cell.entry?.stepsCount">
             {{ formatCellSteps(cell.entry) }} steps
           </span>
-          <span class="day-exercise" *ngIf="cell.entry?.exerciseDone">Exercise</span>
         </button>
       </div>
     </div>
@@ -150,10 +175,17 @@
         <button type="button" class="secondary-btn" (click)="closeEditor()">Close</button>
       </div>
 
-      <label class="exercise-toggle">
-        <input type="checkbox" [(ngModel)]="editor.exerciseDone" />
-        Exercise done
-      </label>
+      <div class="marker-editor">
+        <label
+          class="exercise-toggle"
+          *ngFor="let marker of activityMarkers">
+          <input
+            type="checkbox"
+            [(ngModel)]="editor[marker.key]"
+            (ngModelChange)="onEditorMarkerChanged(marker.key)" />
+          {{ marker.label }}
+        </label>
+      </div>
 
       <div class="editor-field">
         <label>Steps Count</label>

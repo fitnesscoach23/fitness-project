@@ -9,6 +9,7 @@ import { DietApiService } from '../../../../core/services/diet-api.service';
 import { ProgressCheckinApiService } from '../../../../core/services/progress-checkin-api.service';
 import { NotificationApiService } from '../../../../core/api/notification-api.service';
 import { environment } from '../../../../../environments/environment';
+import { DailyCheckinApiService, DailyCheckinDay } from '../../../../core/services/daily-checkin-api.service';
 
 type DueSoonMember = {
   id: string;
@@ -54,6 +55,31 @@ type PendingReviewRow = {
   status: string;
 };
 
+type FollowUpPriority = 'ON_TRACK' | 'NEEDS_CHECK_IN' | 'FOLLOW_UP_RECOMMENDED' | 'RE_ENGAGEMENT_NEEDED';
+
+type FollowUpRequiredRow = {
+  id: string;
+  fullName: string;
+  phone: string;
+  weeklyScore: number;
+  previousWeeklyScore: number | null;
+  trend: 'up' | 'down' | 'stable';
+  daysSinceActivity: number | null;
+  lastActivityDate: string;
+  status: FollowUpPriority;
+  statusLabel: string;
+  generatedMessage: string;
+  sending: boolean;
+  sendStatus: string;
+};
+
+type FollowUpSummary = {
+  onTrack: number;
+  needsCheckIn: number;
+  followUpRecommended: number;
+  reEngagementNeeded: number;
+};
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -94,6 +120,14 @@ export class DashboardComponent implements OnInit {
   billingShareStatus = '';
   sendingCheckinWhatsApp = false;
   sendingBillingWhatsApp = false;
+  followUpRows: FollowUpRequiredRow[] = [];
+  followUpLoading = true;
+  followUpSummary: FollowUpSummary = {
+    onTrack: 0,
+    needsCheckIn: 0,
+    followUpRecommended: 0,
+    reEngagementNeeded: 0
+  };
 
   constructor(
     private memberApi: MemberApiService,
@@ -101,7 +135,8 @@ export class DashboardComponent implements OnInit {
     private workoutApi: WorkoutApiService,
     private dietApi: DietApiService,
     private progressCheckinApi: ProgressCheckinApiService,
-    private notificationApi: NotificationApiService
+    private notificationApi: NotificationApiService,
+    private dailyCheckinApi: DailyCheckinApiService
   ) {}
 
   ngOnInit() {
@@ -134,6 +169,7 @@ export class DashboardComponent implements OnInit {
         this.kpiLoading = false;
         this.dueSoonLoading = false;
         this.checkinReminderLoading = false;
+        this.followUpLoading = false;
       }
     });
   }
@@ -257,6 +293,69 @@ export class DashboardComponent implements OnInit {
 
   get billingAttentionCount(): number {
     return this.dueSoonMembers.length;
+  }
+
+  get followUpAttentionCount(): number {
+    return this.followUpRows.length;
+  }
+
+  getTrendSymbol(trend: FollowUpRequiredRow['trend']): string {
+    if (trend === 'up') return '↑';
+    if (trend === 'down') return '↓';
+    return '→';
+  }
+
+  getFollowUpStatusClass(status: FollowUpPriority): string {
+    if (status === 'RE_ENGAGEMENT_NEEDED') return 'reengagement';
+    if (status === 'FOLLOW_UP_RECOMMENDED') return 'recommended';
+    if (status === 'NEEDS_CHECK_IN') return 'checkin';
+    return 'track';
+  }
+
+  getDaysSinceActivityLabel(days: number | null): string {
+    if (days == null) return '60+ days';
+    if (days === 0) return 'Today';
+    return `${days} day${days === 1 ? '' : 's'}`;
+  }
+
+  viewFollowUpMember(row: FollowUpRequiredRow): void {
+    window.location.href = `/members/${row.id}`;
+  }
+
+  generateFollowUpMessage(row: FollowUpRequiredRow): void {
+    row.generatedMessage = this.buildFollowUpMessage(row);
+    row.sendStatus = 'Message generated. Review before sending.';
+  }
+
+  sendFollowUpWhatsApp(row: FollowUpRequiredRow): void {
+    if (!row.phone) {
+      row.sendStatus = 'Add a phone number before sending WhatsApp.';
+      return;
+    }
+
+    const message = row.generatedMessage || this.buildFollowUpMessage(row);
+    row.generatedMessage = message;
+    row.sending = true;
+    row.sendStatus = 'Sending WhatsApp...';
+
+    this.notificationApi.send({
+      memberId: row.id,
+      channel: 'WHATSAPP',
+      type: 'GENERIC',
+      recipient: row.phone,
+      message
+    }).subscribe({
+      next: (res) => {
+        row.sending = false;
+        row.sendStatus = res.status === 'SENT'
+          ? 'WhatsApp sent.'
+          : 'WhatsApp send failed. Check notification history.';
+      },
+      error: () => {
+        row.sending = false;
+        row.sendStatus = 'Could not send WhatsApp.';
+      }
+    });
   }
 
   setSmartPanel(panel: 'checkins' | 'billing'): void {
@@ -635,11 +734,26 @@ export class DashboardComponent implements OnInit {
       this.kpiLoading = false;
       this.checkinReminderRows = [];
       this.checkinReminderLoading = false;
+      this.followUpRows = [];
+      this.followUpLoading = false;
       return;
     }
 
     this.kpiLoading = true;
     this.checkinReminderLoading = true;
+    this.followUpLoading = true;
+
+    const today = this.startOfDate(new Date());
+    const currentWeekStart = this.getReportWeekStart(today);
+    const currentWeekEnd = this.addDateDays(currentWeekStart, 6);
+    const previousWeekStart = this.addDateDays(currentWeekStart, -7);
+    const previousWeekEnd = this.addDateDays(currentWeekStart, -1);
+    const activityLookbackStart = this.addDateDays(today, -60);
+    const dailyMonthKeys = Array.from(new Set([
+      ...this.getMonthKeysBetweenDates(currentWeekStart, currentWeekEnd),
+      ...this.getMonthKeysBetweenDates(previousWeekStart, previousWeekEnd),
+      ...this.getMonthKeysBetweenDates(activityLookbackStart, today)
+    ]));
 
     const requests = members.map((member) =>
       forkJoin({
@@ -658,11 +772,28 @@ export class DashboardComponent implements OnInit {
         ),
         progressCheckins: this.progressCheckinApi.getCheckinsByMember(member.id).pipe(
           catchError(() => of([]))
+        ),
+        dailyCalendars: forkJoin(
+          dailyMonthKeys.map((month) => this.dailyCheckinApi.getMemberCalendar(member.id, month).pipe(
+            catchError(() => of(null))
+          ))
         )
       }).pipe(
-        map(({ workoutPlans, dietPlan, payments, subscription, progressCheckins }) => {
+        map(({ workoutPlans, dietPlan, payments, subscription, progressCheckins, dailyCalendars }) => {
           const weeklyCheckins = (progressCheckins || []).filter((checkin: any) =>
             this.isCurrentWeek(checkin.submittedAt || checkin.checkInDate || checkin.createdAt)
+          );
+          const dailyDays = (dailyCalendars || []).flatMap((calendar: any) => calendar?.days || []);
+          const followUpRow = this.buildFollowUpRequiredRow(
+            member,
+            workoutPlans,
+            subscription,
+            dailyDays,
+            currentWeekStart,
+            currentWeekEnd,
+            previousWeekStart,
+            previousWeekEnd,
+            today
           );
 
           return {
@@ -681,6 +812,7 @@ export class DashboardComponent implements OnInit {
                 status: this.getCheckinReviewStatusLabel(checkin)
               } as PendingReviewRow)),
             checkinReminder: this.buildCheckinReminderRow(member, progressCheckins || [], subscription),
+            followUpRow
           };
         })
       )
@@ -708,11 +840,19 @@ export class DashboardComponent implements OnInit {
             }
             return a.daysUntilDue - b.daysUntilDue;
           });
+        const allFollowUpRows = rows
+          .map((row) => row.followUpRow)
+          .filter((row): row is FollowUpRequiredRow => !!row);
+        this.followUpSummary = this.buildFollowUpSummary(allFollowUpRows);
+        this.followUpRows = allFollowUpRows
+          .filter((row) => row.status !== 'ON_TRACK')
+          .sort((a, b) => this.getFollowUpPriorityRank(a.status) - this.getFollowUpPriorityRank(b.status));
         this.selectedCheckinMember = this.checkinReminderRows.find(
           (member) => member.id === this.selectedCheckinMember?.id
         ) || this.checkinReminderRows[0] || null;
         this.kpiLoading = false;
         this.checkinReminderLoading = false;
+        this.followUpLoading = false;
       },
       error: () => {
         this.resetKpis();
@@ -720,6 +860,9 @@ export class DashboardComponent implements OnInit {
         this.checkinReminderRows = [];
         this.selectedCheckinMember = null;
         this.checkinReminderLoading = false;
+        this.followUpRows = [];
+        this.followUpSummary = this.buildFollowUpSummary([]);
+        this.followUpLoading = false;
       }
     });
   }
@@ -733,6 +876,8 @@ export class DashboardComponent implements OnInit {
     this.weeklyCheckinCount = 0;
     this.pendingReviewCount = 0;
     this.pendingReviewRows = [];
+    this.followUpRows = [];
+    this.followUpSummary = this.buildFollowUpSummary([]);
   }
 
   private countActiveWorkoutPlans(value: any): number {
@@ -868,6 +1013,168 @@ export class DashboardComponent implements OnInit {
       latestExerciseRating,
       latestNotes: String(latestCheckin?.notes || '').trim()
     };
+  }
+
+  private buildFollowUpRequiredRow(
+    member: any,
+    workoutPlans: any,
+    subscription: any | null,
+    dailyDays: DailyCheckinDay[],
+    currentWeekStart: Date,
+    currentWeekEnd: Date,
+    previousWeekStart: Date,
+    previousWeekEnd: Date,
+    today: Date
+  ): FollowUpRequiredRow {
+    const activeWorkoutPlan = this.getActiveWorkoutPlan(workoutPlans);
+    const currentScore = this.calculateWeeklyConsistencyScore(
+      dailyDays,
+      currentWeekStart,
+      currentWeekEnd,
+      activeWorkoutPlan
+    );
+    const previousScore = this.calculateWeeklyConsistencyScore(
+      dailyDays,
+      previousWeekStart,
+      previousWeekEnd,
+      activeWorkoutPlan
+    );
+    const lastActivityDate = this.getLastActivityDate(dailyDays);
+    const fallbackStartDate = this.getFollowUpBaselineDate(member, subscription);
+    const activityReferenceDate = lastActivityDate || fallbackStartDate;
+    const daysSinceActivity = activityReferenceDate
+      ? this.getDaysBetweenDates(this.parseDateKey(activityReferenceDate), today)
+      : null;
+    const status = this.getFollowUpStatus(currentScore, daysSinceActivity);
+
+    return {
+      id: member.id,
+      fullName: member.fullName,
+      phone: member.phone || '',
+      weeklyScore: currentScore,
+      previousWeeklyScore: previousScore,
+      trend: this.getScoreTrend(currentScore, previousScore),
+      daysSinceActivity,
+      lastActivityDate: lastActivityDate || '',
+      status,
+      statusLabel: this.getFollowUpStatusLabel(status),
+      generatedMessage: '',
+      sending: false,
+      sendStatus: ''
+    };
+  }
+
+  private calculateWeeklyConsistencyScore(
+    days: DailyCheckinDay[],
+    start: Date,
+    end: Date,
+    activeWorkoutPlan: any
+  ): number {
+    const dateKeys = this.getDateKeysBetweenDates(start, end);
+    const entriesByDate = new Map((days || []).map((day) => [day.checkInDate, day]));
+    const weekEntries = dateKeys.map((date) => entriesByDate.get(date) || null);
+    const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
+    const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
+    const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
+    const plannedWorkouts = Array.isArray(activeWorkoutPlan?.days) ? activeWorkoutPlan.days.length : 0;
+    const stepTarget = Math.max(0, Number(activeWorkoutPlan?.targetStepsCount || 0));
+    const workoutCompliance = plannedWorkouts > 0
+      ? Math.min(100, (Math.max(0, completedWorkouts) / plannedWorkouts) * 100)
+      : 0;
+    const stepsCompliance = stepTarget > 0
+      ? Math.min(100, (Math.max(0, averageDailySteps) / stepTarget) * 100)
+      : 0;
+
+    return Math.round((workoutCompliance * 0.7) + (stepsCompliance * 0.3));
+  }
+
+  private getActiveWorkoutPlan(value: any): any {
+    const plans = Array.isArray(value) ? value : value ? [value] : [];
+    return plans.find((plan) => !plan?.status || plan.status === 'ACTIVE') || null;
+  }
+
+  private getLastActivityDate(days: DailyCheckinDay[]): string {
+    return [...(days || [])]
+      .filter((day) => this.isActiveDailyEntry(day))
+      .map((day) => day.checkInDate)
+      .sort((a, b) => b.localeCompare(a))[0] || '';
+  }
+
+  private getFollowUpBaselineDate(member: any, subscription: any | null): string {
+    const override = this.getStoredOverride(member.id);
+    return this.getMemberCreatedDate(member)
+      || this.normalizeDateInput(override?.activeSince || '')
+      || this.normalizeDateInput(subscription?.startDate || '')
+      || this.normalizeDateInput(subscription?.createdAt || '');
+  }
+
+  private isActiveDailyEntry(entry: DailyCheckinDay | null): boolean {
+    return Boolean(
+      entry?.exerciseDone
+      || entry?.stepTargetAchieved
+      || entry?.travelWorkout
+      || entry?.recoveryDay
+      || entry?.activeOther
+    );
+  }
+
+  private getFollowUpStatus(score: number, daysSinceActivity: number | null): FollowUpPriority {
+    if (daysSinceActivity == null || daysSinceActivity >= 7) return 'RE_ENGAGEMENT_NEEDED';
+    if (score < 70) return 'FOLLOW_UP_RECOMMENDED';
+    if (daysSinceActivity >= 4) return 'NEEDS_CHECK_IN';
+    return 'ON_TRACK';
+  }
+
+  private getFollowUpStatusLabel(status: FollowUpPriority): string {
+    if (status === 'RE_ENGAGEMENT_NEEDED') return 'Re-engagement Needed';
+    if (status === 'FOLLOW_UP_RECOMMENDED') return 'Follow-Up Recommended';
+    if (status === 'NEEDS_CHECK_IN') return 'Needs Check-In';
+    return 'On Track';
+  }
+
+  private getScoreTrend(currentScore: number, previousScore: number | null): FollowUpRequiredRow['trend'] {
+    if (previousScore == null) return 'stable';
+    const difference = currentScore - previousScore;
+    if (difference >= 5) return 'up';
+    if (difference <= -5) return 'down';
+    return 'stable';
+  }
+
+  private getFollowUpPriorityRank(status: FollowUpPriority): number {
+    if (status === 'RE_ENGAGEMENT_NEEDED') return 1;
+    if (status === 'FOLLOW_UP_RECOMMENDED') return 2;
+    if (status === 'NEEDS_CHECK_IN') return 3;
+    return 4;
+  }
+
+  private buildFollowUpSummary(rows: FollowUpRequiredRow[]): FollowUpSummary {
+    return {
+      onTrack: rows.filter((row) => row.status === 'ON_TRACK').length,
+      needsCheckIn: rows.filter((row) => row.status === 'NEEDS_CHECK_IN').length,
+      followUpRecommended: rows.filter((row) => row.status === 'FOLLOW_UP_RECOMMENDED').length,
+      reEngagementNeeded: rows.filter((row) => row.status === 'RE_ENGAGEMENT_NEEDED').length
+    };
+  }
+
+  private buildFollowUpMessage(row: FollowUpRequiredRow): string {
+    const firstName = this.getFirstName(row.fullName);
+    const lastActivity = row.lastActivityDate
+      ? `I noticed your last logged activity was on ${this.formatDate(row.lastActivityDate)}.`
+      : 'I noticed we have not had a recent activity update logged.';
+
+    if (row.status === 'NEEDS_CHECK_IN') {
+      return `Hi ${firstName}, just checking in. ${lastActivity} No pressure if the week has been busy. Send me a quick update and we can adjust the next step to something manageable.`;
+    }
+
+    if (row.status === 'RE_ENGAGEMENT_NEEDED') {
+      return `Hi ${firstName}, wanted to reconnect and help you restart gently. ${lastActivity} Even a short walk, recovery session, or travel-friendly workout counts. Reply with what feels realistic today.`;
+    }
+
+    if (row.status === 'FOLLOW_UP_RECOMMENDED') {
+      return `Hi ${firstName}, your weekly consistency score was ${row.weeklyScore}/100. Let us keep the next step simple and focus on one workout or movement win today.`;
+    }
+
+    return `Hi ${firstName}, you are on track. Keep the rhythm steady and share today's activity update when you can.`;
   }
 
   private getLatestProgressCheckinDate(checkins: any[]): string {
@@ -1015,6 +1322,74 @@ export class DashboardComponent implements OnInit {
     parsed.setHours(0, 0, 0, 0);
     parsed.setDate(parsed.getDate() + days);
     return parsed.toISOString().slice(0, 10);
+  }
+
+  private getReportWeekStart(value: Date): Date {
+    const sundayStart = this.getSundayWeekStart(value);
+    return value.getDay() === 0 ? this.addDateDays(sundayStart, -7) : sundayStart;
+  }
+
+  private getSundayWeekStart(value: Date): Date {
+    const date = this.startOfDate(value);
+    return this.addDateDays(date, -date.getDay());
+  }
+
+  private startOfDate(value: Date): Date {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  private addDateDays(value: Date, days: number): Date {
+    const date = new Date(value);
+    date.setDate(date.getDate() + days);
+    return date;
+  }
+
+  private getMonthKeysBetweenDates(start: Date, end: Date): string[] {
+    const keys: string[] = [];
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
+
+    while (cursor <= last) {
+      keys.push(this.getMonthKeyFromDate(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return keys;
+  }
+
+  private getDateKeysBetweenDates(start: Date, end: Date): string[] {
+    const keys: string[] = [];
+    let cursor = this.startOfDate(start);
+    const last = this.startOfDate(end);
+
+    while (cursor <= last) {
+      keys.push(this.getDateKeyFromDate(cursor));
+      cursor = this.addDateDays(cursor, 1);
+    }
+
+    return keys;
+  }
+
+  private getMonthKeyFromDate(value: Date): string {
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    return `${value.getFullYear()}-${month}`;
+  }
+
+  private getDateKeyFromDate(value: Date): string {
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${value.getFullYear()}-${month}-${day}`;
+  }
+
+  private parseDateKey(value: string): Date {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  private getDaysBetweenDates(start: Date, end: Date): number {
+    const startMs = this.startOfDate(start).getTime();
+    const endMs = this.startOfDate(end).getTime();
+    return Math.max(0, Math.floor((endMs - startMs) / 86400000));
   }
 
   private addMonths(value: string, months: number): string {

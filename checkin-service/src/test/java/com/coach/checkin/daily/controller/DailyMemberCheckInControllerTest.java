@@ -66,6 +66,11 @@ class DailyMemberCheckInControllerTest {
                         true,
                         9000,
                         true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        true,
                         "Strong day",
                         Instant.parse("2026-04-10T00:00:00Z"),
                         Instant.parse("2026-04-10T00:05:00Z")
@@ -80,11 +85,14 @@ class DailyMemberCheckInControllerTest {
                                   "checkInDate": "2026-04-10",
                                   "exerciseDone": true,
                                   "stepsCount": 9000,
+                                  "stepTargetAchieved": true,
                                   "notes": "Strong day"
                                 }
                                 """.formatted(memberId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.exerciseDone").value(true))
+                .andExpect(jsonPath("$.stepTargetAchieved").value(true))
                 .andExpect(jsonPath("$.stepsCount").value(9000));
     }
 
@@ -115,6 +123,11 @@ class DailyMemberCheckInControllerTest {
                                 LocalDate.of(2026, 4, 10),
                                 true,
                                 9000,
+                                true,
+                                false,
+                                false,
+                                false,
+                                false,
                                 true,
                                 "Strong day",
                                 Instant.parse("2026-04-10T00:00:00Z"),

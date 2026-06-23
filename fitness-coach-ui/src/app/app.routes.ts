@@ -15,6 +15,12 @@ export const routes: Routes = [
     component: AppShellComponent,
     canActivate: [authGuard],
     children: [
+      {
+        path: 'dashboard/activity-entry',
+        loadComponent: () =>
+            import('./features/dashboard/pages/activity-entry/activity-entry.component')
+            .then(m => m.ActivityEntryComponent)
+      },
       { path: 'dashboard', component: DashboardComponent },
       { path: 'members', component: MemberListComponent },
       {

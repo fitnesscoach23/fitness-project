@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import {
   DailyCheckinApiService,
+  DailyActivityMarker,
   DailyCheckinCalendar,
   DailyCheckinDay,
   DailyCheckinSummary
@@ -19,16 +20,22 @@ interface CalendarCell {
 interface DailyCheckinEditor {
   checkInDate: string;
   exerciseDone: boolean;
+  stepTargetAchieved: boolean;
+  travelWorkout: boolean;
+  recoveryDay: boolean;
+  activeOther: boolean;
+  notActive: boolean;
   stepsCount: number | null;
   notes: string;
 }
 
-type BulkStatus = 'ACTIVE' | 'INACTIVE';
-
 interface BulkDailyCheckinEditor {
   startDate: string;
   endDate: string;
-  status: BulkStatus;
+  marker: DailyActivityMarker;
+  value: boolean;
+  noWorkout: boolean;
+  noSteps: boolean;
   stepsCount: number | null;
   notes: string;
 }
@@ -45,6 +52,14 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   @Output() checkinsChanged = new EventEmitter<void>();
 
   readonly weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  readonly activityMarkers: { key: DailyActivityMarker; label: string; className: string }[] = [
+    { key: 'exerciseDone', label: 'Workout Completed', className: 'workout-completed' },
+    { key: 'stepTargetAchieved', label: 'Step Target Achieved', className: 'step-target-achieved' },
+    { key: 'travelWorkout', label: 'Travel Workout', className: 'travel-workout' },
+    { key: 'recoveryDay', label: 'Recovery Day', className: 'recovery-day' },
+    { key: 'activeOther', label: 'Active Other', className: 'active-other' },
+    { key: 'notActive', label: 'Not Active', className: 'not-active' }
+  ];
   readonly emptySummary: DailyCheckinSummary = {
     daysInMonth: 0,
     recordedDays: 0,
@@ -105,6 +120,11 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     this.editor = {
       checkInDate: cell.date,
       exerciseDone: Boolean(cell.entry?.exerciseDone),
+      stepTargetAchieved: Boolean(cell.entry?.stepTargetAchieved),
+      travelWorkout: Boolean(cell.entry?.travelWorkout),
+      recoveryDay: Boolean(cell.entry?.recoveryDay),
+      activeOther: Boolean(cell.entry?.activeOther),
+      notActive: Boolean(cell.entry?.notActive),
       stepsCount: cell.entry?.stepsCount ?? null,
       notes: cell.entry?.notes || ''
     };
@@ -144,6 +164,11 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       memberId: this.memberId,
       checkInDate: this.editor.checkInDate,
       exerciseDone: this.editor.exerciseDone,
+      stepTargetAchieved: this.editor.stepTargetAchieved,
+      travelWorkout: this.editor.travelWorkout,
+      recoveryDay: this.editor.recoveryDay,
+      activeOther: this.editor.activeOther,
+      notActive: this.editor.notActive,
       stepsCount: Math.max(0, Number(this.editor.stepsCount || 0)),
       notes: this.editor.notes.trim() || null
     }).subscribe({
@@ -169,13 +194,14 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       return;
     }
 
+    const noWorkoutText = this.bulkEditor.noWorkout ? ', mark no workout' : '';
+    const noStepsText = this.bulkEditor.noSteps ? ', mark no steps' : '';
     const confirmed = window.confirm(
-      `Update ${dateKeys.length} day${dateKeys.length === 1 ? '' : 's'} to ${this.bulkEditor.status.toLowerCase()}?`
+      `${this.bulkEditor.value ? 'Add' : 'Remove'} ${this.getMarkerLabel(this.bulkEditor.marker)}${noWorkoutText}${noStepsText} for ${dateKeys.length} day${dateKeys.length === 1 ? '' : 's'}?`
     );
     if (!confirmed) return;
 
     const entriesByDate = new Map((this.calendar?.days || []).map((day) => [day.checkInDate, day]));
-    const markActive = this.bulkEditor.status === 'ACTIVE';
     const bulkSteps = this.bulkEditor.stepsCount == null
       ? null
       : Math.max(0, Number(this.bulkEditor.stepsCount || 0));
@@ -187,14 +213,36 @@ export class DailyCheckinCalendarComponent implements OnChanges {
 
     forkJoin(dateKeys.map((checkInDate) => {
       const existing = entriesByDate.get(checkInDate);
-      const stepsCount = markActive
-        ? (bulkSteps ?? Math.max(0, Number(existing?.stepsCount || 0)))
-        : 0;
+      const addingActiveMarker = this.bulkEditor.marker !== 'notActive' && this.bulkEditor.value;
+      const bulkNotActive = addingActiveMarker
+        ? false
+        : this.getBulkMarkerValue(existing, 'notActive');
+      const exerciseDone = bulkNotActive || this.bulkEditor.noWorkout
+        ? false
+        : this.getBulkMarkerValue(existing, 'exerciseDone');
+      const stepTargetAchieved = bulkNotActive || this.bulkEditor.noSteps
+        ? false
+        : this.getBulkMarkerValue(existing, 'stepTargetAchieved');
+      const travelWorkout = bulkNotActive ? false : this.getBulkMarkerValue(existing, 'travelWorkout');
+      const recoveryDay = bulkNotActive ? false : this.getBulkMarkerValue(existing, 'recoveryDay');
+      const activeOther = bulkNotActive ? false : this.getBulkMarkerValue(existing, 'activeOther');
+      const finalNotActive = bulkNotActive && !exerciseDone && !stepTargetAchieved
+        && !travelWorkout
+        && !recoveryDay
+        && !activeOther;
+      const stepsCount = this.bulkEditor.noSteps || finalNotActive
+        ? 0
+        : (bulkSteps ?? Math.max(0, Number(existing?.stepsCount || 0)));
 
       return this.dailyCheckinApi.upsertDailyCheckin({
         memberId: this.memberId,
         checkInDate,
-        exerciseDone: markActive,
+        exerciseDone,
+        stepTargetAchieved,
+        travelWorkout,
+        recoveryDay,
+        activeOther,
+        notActive: finalNotActive,
         stepsCount,
         notes: notes || existing?.notes || null
       });
@@ -238,7 +286,45 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   getCellClass(cell: CalendarCell): string {
     if (!cell.inMonth) return 'empty';
     if (!cell.entry) return 'no-entry';
-    return cell.entry.active ? 'active-day' : 'inactive-day';
+    return this.isEntryActive(cell.entry) ? 'active-day' : 'no-activity';
+  }
+
+  getMarkerLabel(marker: DailyActivityMarker): string {
+    return this.activityMarkers.find((option) => option.key === marker)?.label || '';
+  }
+
+  getEntryMarkers(entry: DailyCheckinDay | null): { label: string; className: string }[] {
+    if (!entry) return [];
+    return this.activityMarkers
+      .filter((marker) => Boolean(entry[marker.key]))
+      .map((marker) => ({ label: marker.label, className: marker.className }));
+  }
+
+  isEntryActive(entry: DailyCheckinDay | null): boolean {
+    if (!entry) return false;
+    return Boolean(entry.exerciseDone || entry.stepTargetAchieved || entry.travelWorkout || entry.recoveryDay || entry.activeOther);
+  }
+
+  getMarkerChecked(marker: DailyActivityMarker): boolean {
+    return Boolean(this.editor?.[marker]);
+  }
+
+  onEditorMarkerChanged(marker: DailyActivityMarker): void {
+    if (!this.editor) return;
+
+    if (marker === 'notActive' && this.editor.notActive) {
+      this.editor.exerciseDone = false;
+      this.editor.stepTargetAchieved = false;
+      this.editor.travelWorkout = false;
+      this.editor.recoveryDay = false;
+      this.editor.activeOther = false;
+      this.editor.stepsCount = 0;
+      return;
+    }
+
+    if (marker !== 'notActive' && this.editor[marker]) {
+      this.editor.notActive = false;
+    }
   }
 
   formatCellSteps(entry: DailyCheckinDay | null): string {
@@ -316,7 +402,10 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     return {
       startDate: firstDate,
       endDate: lastDate,
-      status: 'ACTIVE',
+      marker: 'activeOther',
+      value: true,
+      noWorkout: false,
+      noSteps: false,
       stepsCount: null,
       notes: ''
     };
@@ -349,5 +438,12 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     const month = String(value.getMonth() + 1).padStart(2, '0');
     const day = String(value.getDate()).padStart(2, '0');
     return `${value.getFullYear()}-${month}-${day}`;
+  }
+
+  private getBulkMarkerValue(entry: DailyCheckinDay | undefined, marker: DailyActivityMarker): boolean {
+    if (this.bulkEditor.marker === marker) {
+      return this.bulkEditor.value;
+    }
+    return Boolean(entry?.[marker]);
   }
 }

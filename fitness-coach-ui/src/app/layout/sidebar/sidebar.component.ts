@@ -12,6 +12,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 export class SidebarComponent {
   readonly navItems = [
     { label: 'Dashboard', route: '/dashboard', icon: 'D' },
+    { label: 'Activity Entry', route: '/dashboard/activity-entry', icon: 'A' },
     { label: 'Members', route: '/members', icon: 'M' },
     { label: 'Workout Plan', route: '/plans/workouts/create', icon: 'W' },
     { label: 'Exercise Library', route: '/exercise-library', icon: 'E' },

@@ -11,6 +11,11 @@ public record UpsertDailyMemberCheckInRequest(
         @NotNull LocalDate checkInDate,
         Boolean exerciseDone,
         @PositiveOrZero Integer stepsCount,
+        Boolean stepTargetAchieved,
+        Boolean travelWorkout,
+        Boolean recoveryDay,
+        Boolean activeOther,
+        Boolean notActive,
         String notes
 ) {
 }

@@ -1,0 +1,110 @@
+<div class="activity-entry-page">
+  <div class="activity-entry-header">
+    <div>
+      <h1>Dashboard Activity Entry</h1>
+      <p>Record workout and step completion for multiple members from one screen.</p>
+    </div>
+    <a routerLink="/dashboard" class="secondary-action">Back to Dashboard</a>
+  </div>
+
+  <div class="activity-toolbar">
+    <label>
+      Activity Date
+      <input type="date" [(ngModel)]="selectedDate" (change)="onDateChanged()" />
+    </label>
+
+    <div class="activity-filters" role="group" aria-label="Activity filters">
+      <button type="button" [class.active]="filter === 'pending'" (click)="setFilter('pending')">
+        Pending Activity
+      </button>
+      <button type="button" [class.active]="filter === 'all'" (click)="setFilter('all')">
+        All Members
+      </button>
+      <button type="button" [class.active]="filter === 'activeOnly'" (click)="setFilter('activeOnly')">
+        Active Members Only
+      </button>
+    </div>
+
+    <button
+      type="button"
+      class="primary-action"
+      [disabled]="savingAll || loading || !filteredRows.length"
+      (click)="saveAll()">
+      {{ savingAll ? 'Saving...' : 'Bulk Save Shown' }}
+    </button>
+  </div>
+
+  <div class="activity-summary">
+    <div>
+      <span>Visible Members</span>
+      <strong>{{ filteredRows.length }}</strong>
+    </div>
+    <div>
+      <span>Pending Activity</span>
+      <strong>{{ pendingCount }}</strong>
+    </div>
+    <div>
+      <span>Recorded</span>
+      <strong>{{ recordedCount }}</strong>
+    </div>
+  </div>
+
+  <div *ngIf="message" class="activity-message">{{ message }}</div>
+  <div *ngIf="loading" class="activity-state">Loading activity entries...</div>
+
+  <div class="activity-table-card" *ngIf="!loading">
+    <div *ngIf="!filteredRows.length" class="activity-state">
+      No members match this filter.
+    </div>
+
+    <div class="activity-table-wrap" *ngIf="filteredRows.length">
+      <table class="activity-table">
+        <thead>
+          <tr>
+            <th>Member Name</th>
+            <th>Workout Completed</th>
+            <th>Steps Count</th>
+            <th>Notes</th>
+            <th>Status</th>
+            <th>Save</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let row of filteredRows"
+            [class.pending-row]="!row.existingEntry"
+            [class.inactive-row]="!isActiveMember(row)">
+            <td>
+              <strong>{{ row.fullName }}</strong>
+              <span>{{ row.email }}</span>
+            </td>
+            <td>
+              <input type="checkbox" [(ngModel)]="row.workoutCompleted" />
+            </td>
+            <td>
+              <input type="number" min="0" [(ngModel)]="row.stepsCount" placeholder="0" />
+            </td>
+            <td>
+              <input type="text" [(ngModel)]="row.notes" placeholder="Optional notes" />
+            </td>
+            <td>
+              <span class="pending-badge" *ngIf="!row.existingEntry">Pending</span>
+              <span class="saved-badge" *ngIf="row.existingEntry && !row.saved">Recorded</span>
+              <span class="saved-badge" *ngIf="row.saved">Saved</span>
+              <span class="error-badge" *ngIf="row.error">{{ row.error }}</span>
+            </td>
+            <td>
+              <button
+                type="button"
+                class="secondary-action"
+                [disabled]="row.saving"
+                (click)="saveRow(row)">
+                {{ row.saving ? 'Saving...' : 'Save' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

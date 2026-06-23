@@ -62,7 +62,7 @@ class DailyMemberCheckInServiceTest {
 
         DailyMemberCheckInDayResponse response = service.upsert(
                 "coach@test.com",
-                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, true, 9000, "Strong day")
+                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, true, 9000, true, false, false, false, false, "Strong day")
         );
 
         ArgumentCaptor<DailyMemberCheckIn> captor = ArgumentCaptor.forClass(DailyMemberCheckIn.class);
@@ -73,8 +73,11 @@ class DailyMemberCheckInServiceTest {
         assertEquals(checkInDate, saved.getCheckInDate());
         assertTrue(saved.getExerciseDone());
         assertEquals(9000, saved.getStepsCount());
+        assertTrue(saved.getStepTargetAchieved());
         assertEquals("Strong day", saved.getNotes());
         assertTrue(response.active());
+        assertTrue(response.exerciseDone());
+        assertTrue(response.stepTargetAchieved());
         assertNotNull(response.id());
     }
 
@@ -100,12 +103,13 @@ class DailyMemberCheckInServiceTest {
 
         DailyMemberCheckInDayResponse response = service.upsert(
                 "coach@test.com",
-                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, false, 0, "Rest day")
+                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, false, 0, false, false, true, false, false, "Rest day")
         );
 
         assertEquals(existingId, response.id());
         assertFalse(response.exerciseDone());
-        assertFalse(response.active());
+        assertTrue(response.active());
+        assertTrue(response.recoveryDay());
         assertEquals(0, response.stepsCount());
         assertEquals("Rest day", response.notes());
     }
@@ -128,6 +132,7 @@ class DailyMemberCheckInServiceTest {
                         .checkInDate(LocalDate.of(2026, 4, 2))
                         .exerciseDone(true)
                         .stepsCount(8000)
+                        .stepTargetAchieved(true)
                         .notes("Training")
                         .createdAt(Instant.parse("2026-04-02T00:00:00Z"))
                         .updatedAt(Instant.parse("2026-04-02T00:01:00Z"))
@@ -139,6 +144,7 @@ class DailyMemberCheckInServiceTest {
                         .checkInDate(LocalDate.of(2026, 4, 3))
                         .exerciseDone(false)
                         .stepsCount(3500)
+                        .activeOther(true)
                         .notes("Walk only")
                         .createdAt(Instant.parse("2026-04-03T00:00:00Z"))
                         .updatedAt(Instant.parse("2026-04-03T00:01:00Z"))

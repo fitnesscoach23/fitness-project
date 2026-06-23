@@ -8,11 +8,24 @@ export interface DailyCheckinDay {
   checkInDate: string;
   exerciseDone: boolean;
   stepsCount: number;
+  stepTargetAchieved?: boolean;
+  travelWorkout?: boolean;
+  recoveryDay?: boolean;
+  activeOther?: boolean;
+  notActive?: boolean;
   active: boolean;
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type DailyActivityMarker =
+  | 'exerciseDone'
+  | 'stepTargetAchieved'
+  | 'travelWorkout'
+  | 'recoveryDay'
+  | 'activeOther'
+  | 'notActive';
 
 export interface DailyCheckinSummary {
   daysInMonth: number;
@@ -34,6 +47,11 @@ export interface DailyCheckinUpsertRequest {
   checkInDate: string;
   exerciseDone: boolean;
   stepsCount: number;
+  stepTargetAchieved?: boolean;
+  travelWorkout?: boolean;
+  recoveryDay?: boolean;
+  activeOther?: boolean;
+  notActive?: boolean;
   notes?: string | null;
 }
 

@@ -118,8 +118,17 @@
 
 .bulk-update-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+}
+
+.bulk-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  color: #374151;
+  font-size: 13px;
 }
 
 .bulk-actions {
@@ -178,12 +187,11 @@
   background: #ffffff;
 }
 
-.legend-dot.inactive-day {
-  background: #fef3c7;
-  border-color: #f59e0b;
-}
-
-.legend-dot.active-day {
+.legend-dot.workout-completed,
+.legend-dot.step-target-achieved,
+.legend-dot.travel-workout,
+.legend-dot.recovery-day,
+.legend-dot.active-other {
   background: #dcfce7;
   border-color: #16a34a;
 }
@@ -246,7 +254,7 @@
   background: #ffffff;
 }
 
-.day-cell.inactive-day {
+.day-cell.no-activity {
   background: #fffbeb;
 }
 
@@ -277,15 +285,9 @@
   color: #374151;
 }
 
-.active-day .day-state,
 .day-exercise {
   background: #dcfce7;
   color: #166534;
-}
-
-.inactive-day .day-state {
-  background: #fef3c7;
-  color: #92400e;
 }
 
 .day-steps {

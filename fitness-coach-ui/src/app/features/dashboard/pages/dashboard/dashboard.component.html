@@ -90,6 +90,98 @@
 
   </div>
 
+  <div class="dashboard-section follow-up-widget">
+    <div class="section-head follow-up-widget-head">
+      <div>
+        <h2>Follow-Up Required</h2>
+        <p>Members who may need coach attention based on consistency and recent activity.</p>
+      </div>
+      <span>{{ followUpAttentionCount }} need attention</span>
+    </div>
+
+    <div class="follow-up-summary-grid">
+      <div class="follow-up-summary-card track">
+        <span>Members On Track</span>
+        <strong>{{ followUpSummary.onTrack }}</strong>
+      </div>
+      <div class="follow-up-summary-card checkin">
+        <span>Need Check-In</span>
+        <strong>{{ followUpSummary.needsCheckIn }}</strong>
+      </div>
+      <div class="follow-up-summary-card recommended">
+        <span>Need Follow-Up</span>
+        <strong>{{ followUpSummary.followUpRecommended }}</strong>
+      </div>
+      <div class="follow-up-summary-card reengagement">
+        <span>Re-engagement Needed</span>
+        <strong>{{ followUpSummary.reEngagementNeeded }}</strong>
+      </div>
+    </div>
+
+    <div class="follow-up-table-card">
+      <div *ngIf="followUpLoading" class="due-state">Loading follow-up priorities...</div>
+
+      <div *ngIf="!followUpLoading && !followUpRows.length" class="due-state">
+        No members need follow-up right now.
+      </div>
+
+      <div class="follow-up-table-wrap" *ngIf="!followUpLoading && followUpRows.length">
+        <table class="follow-up-table">
+          <thead>
+            <tr>
+              <th>Member Name</th>
+              <th>Weekly Score</th>
+              <th>Trend</th>
+              <th>Days Since Activity</th>
+              <th>Follow-Up Status</th>
+              <th>Last Activity Date</th>
+              <th>Quick Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of followUpRows">
+              <td>
+                <strong>{{ row.fullName }}</strong>
+                <small *ngIf="row.sendStatus">{{ row.sendStatus }}</small>
+              </td>
+              <td>{{ row.weeklyScore }}/100</td>
+              <td>
+                <span class="follow-up-trend" [ngClass]="row.trend">
+                  {{ getTrendSymbol(row.trend) }}
+                </span>
+              </td>
+              <td>{{ getDaysSinceActivityLabel(row.daysSinceActivity) }}</td>
+              <td>
+                <span class="follow-up-badge" [ngClass]="getFollowUpStatusClass(row.status)">
+                  {{ row.statusLabel }}
+                </span>
+              </td>
+              <td>{{ formatDate(row.lastActivityDate) }}</td>
+              <td>
+                <div class="follow-up-actions">
+                  <button type="button" class="secondary-action" (click)="viewFollowUpMember(row)">View Member</button>
+                  <button type="button" class="secondary-action" (click)="generateFollowUpMessage(row)">Generate Follow-Up Message</button>
+                  <button
+                    type="button"
+                    class="primary-action"
+                    [disabled]="row.sending"
+                    (click)="sendFollowUpWhatsApp(row)">
+                    {{ row.sending ? 'Sending...' : 'Send WhatsApp' }}
+                  </button>
+                </div>
+                <textarea
+                  *ngIf="row.generatedMessage"
+                  rows="3"
+                  [(ngModel)]="row.generatedMessage"
+                  class="follow-up-message"></textarea>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="dashboard-section smart-section">
     <div class="smart-panel">
       <div class="smart-panel-head">

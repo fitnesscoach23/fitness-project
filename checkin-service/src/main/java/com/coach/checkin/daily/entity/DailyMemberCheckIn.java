@@ -43,6 +43,26 @@ public class DailyMemberCheckIn {
 
     private Integer stepsCount;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean stepTargetAchieved = Boolean.FALSE;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean travelWorkout = Boolean.FALSE;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean recoveryDay = Boolean.FALSE;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean activeOther = Boolean.FALSE;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean notActive = Boolean.FALSE;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
