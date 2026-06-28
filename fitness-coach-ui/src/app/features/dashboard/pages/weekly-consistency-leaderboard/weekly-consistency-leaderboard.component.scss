@@ -1,0 +1,379 @@
+.leaderboard-page {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 32px;
+}
+
+.leaderboard-shell {
+  width: min(100%, 980px);
+  display: grid;
+  gap: 20px;
+}
+
+.leaderboard-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.leaderboard-controls h1 {
+  margin: 0;
+  color: #111827;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.leaderboard-controls p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.controls-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.threshold-field {
+  display: grid;
+  gap: 4px;
+  min-width: 132px;
+}
+
+.threshold-field span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.threshold-field input {
+  margin: 0;
+}
+
+.state-card {
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.state-card.error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.leaderboard-card {
+  width: min(100%, 456px);
+  min-height: 780px;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px 24px 24px;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 56%, #ecfdf5 100%);
+  border: 1px solid rgba(203, 213, 225, 0.86);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.leaderboard-card.exporting {
+  box-shadow: none;
+}
+
+.capture-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.capture-topline span {
+  color: #0f766e;
+}
+
+.capture-topline strong {
+  color: #475569;
+}
+
+.capture-header {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  padding: 2px 6px 0;
+}
+
+.capture-header p,
+.capture-header h2,
+.capture-header span {
+  margin: 0;
+}
+
+.capture-header p {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.capture-header h2 {
+  color: #111827;
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.capture-header span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.leaderboard-state {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 360px;
+  padding: 22px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+  text-align: center;
+  font-weight: 800;
+}
+
+.podium-list {
+  display: grid;
+  gap: 12px;
+}
+
+.podium-card {
+  display: grid;
+  gap: 13px;
+  padding: 15px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.podium-card.gold {
+  border-color: #facc15;
+  background: linear-gradient(180deg, #fffbea, #ffffff 74%);
+}
+
+.podium-card.silver {
+  border-color: #cbd5e1;
+  background: linear-gradient(180deg, #f8fafc, #ffffff 74%);
+}
+
+.podium-card.bronze {
+  border-color: #fdba74;
+  background: linear-gradient(180deg, #fff7ed, #ffffff 74%);
+}
+
+.place-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  min-height: 30px;
+  padding: 0 11px 0 5px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.place-medal {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.podium-card.gold .place-medal {
+  background: #facc15;
+}
+
+.podium-card.silver .place-medal {
+  background: #cbd5e1;
+}
+
+.podium-card.bronze .place-medal {
+  background: #fdba74;
+}
+
+.member-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.member-row h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 21px;
+  line-height: 1.12;
+  font-weight: 900;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.member-row p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.member-row strong {
+  flex: 0 0 auto;
+  color: #0f766e;
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.metric-grid div {
+  display: grid;
+  gap: 4px;
+  min-height: 78px;
+  padding: 11px 10px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid #e2e8f0;
+}
+
+.metric-grid label {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.metric-grid span {
+  color: #111827;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.metric-grid small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.leaderboard-footer {
+  margin-top: auto;
+  display: grid;
+  gap: 7px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #0f172a;
+  color: #ffffff;
+  text-align: center;
+}
+
+.footer-kicker {
+  color: #86efac;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.leaderboard-footer p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 750;
+}
+
+@media (max-width: 720px) {
+  .leaderboard-page {
+    padding-bottom: 16px;
+  }
+
+  .leaderboard-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .controls-row {
+    justify-content: stretch;
+  }
+
+  .controls-row .btn,
+  .threshold-field {
+    width: 100%;
+  }
+
+  .leaderboard-card {
+    width: 100%;
+    min-height: 720px;
+    border-radius: 20px;
+    padding: 24px 16px 18px;
+  }
+
+  .capture-header h2 {
+    font-size: 36px;
+  }
+
+  .member-row h3 {
+    font-size: 19px;
+  }
+
+  .member-row strong {
+    font-size: 36px;
+  }
+
+  .metric-grid label {
+    font-size: 8.5px;
+  }
+
+  .leaderboard-footer p {
+    font-size: 12px;
+  }
+}

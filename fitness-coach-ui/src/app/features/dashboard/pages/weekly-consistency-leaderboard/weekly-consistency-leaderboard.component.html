@@ -1,0 +1,105 @@
+<div class="leaderboard-page">
+  <div class="leaderboard-shell">
+    <section class="leaderboard-controls" data-html2canvas-ignore="true">
+      <div>
+        <h1>Weekly Consistency Leaderboard</h1>
+        <p>Generate a shareable Top 3 for the previous Sunday-Saturday week.</p>
+      </div>
+
+      <div class="controls-row">
+        <label class="threshold-field" for="leaderboardThreshold">
+          <span>Minimum score</span>
+          <input
+            id="leaderboardThreshold"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            [(ngModel)]="threshold" />
+        </label>
+
+        <button
+          type="button"
+          class="btn btn-secondary"
+          [disabled]="loading"
+          (click)="generateLeaderboard()">
+          {{ loading ? 'Generating...' : 'Generate Leaderboard' }}
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="exporting || loading || !leaderboard.length"
+          (click)="exportAsImage()">
+          {{ exporting ? 'Exporting...' : 'Export as Image' }}
+        </button>
+      </div>
+    </section>
+
+    <div *ngIf="error" class="state-card error" data-html2canvas-ignore="true">
+      {{ error }}
+    </div>
+
+    <section
+      #leaderboardCapture
+      class="leaderboard-card"
+      [class.exporting]="exporting">
+      <div class="capture-topline">
+        <span>TrainWithVarun</span>
+        <strong>Previous Week</strong>
+      </div>
+
+      <header class="capture-header">
+        <p>Weekly Consistency</p>
+        <h2>Champions</h2>
+        <span>{{ weekRangeLabel }}</span>
+      </header>
+
+      <div *ngIf="loading" class="leaderboard-state">
+        Building leaderboard...
+      </div>
+
+      <div *ngIf="!loading && !leaderboard.length" class="leaderboard-state">
+        No consistency champions qualified this week.
+      </div>
+
+      <div class="podium-list" *ngIf="!loading && leaderboard.length">
+        <article
+          *ngFor="let entry of leaderboard; trackBy: trackByPlace"
+          class="podium-card"
+          [ngClass]="getPlaceClass(entry.place)">
+          <div class="place-badge">
+            <span class="place-medal">{{ entry.place }}</span>
+            {{ getMedalLabel(entry.place) }}
+          </div>
+
+          <div class="member-row">
+            <div>
+              <h3>{{ entry.memberName }}</h3>
+              <p>Weekly Score</p>
+            </div>
+            <strong>{{ entry.weeklyScore }}</strong>
+          </div>
+
+          <div class="metric-grid">
+            <div>
+              <label>Workout Compliance</label>
+              <span>{{ entry.workoutCompliance }}%</span>
+              <small>{{ entry.completedWorkouts }}/{{ entry.plannedWorkouts }} workouts</small>
+            </div>
+            <div>
+              <label>Steps Compliance</label>
+              <span>{{ entry.stepsCompliance }}%</span>
+              <small>{{ entry.averageDailySteps | number:'1.0-0' }} / {{ entry.stepTarget | number:'1.0-0' }}</small>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <footer class="leaderboard-footer">
+        <span class="footer-kicker">Consistency Champions</span>
+        <p>{{ motivationalFooter }}</p>
+      </footer>
+    </section>
+  </div>
+</div>

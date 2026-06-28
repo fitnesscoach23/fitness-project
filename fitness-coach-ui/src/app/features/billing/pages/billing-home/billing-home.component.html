@@ -115,6 +115,7 @@
         </div>
         <div class="stat-box">
           <span class="stat-label">Pending</span>
+          <small>{{ pendingAmountSource }}</small>
           <strong>₹ {{ totalPending }}</strong>
         </div>
         <div class="stat-box">
@@ -149,12 +150,107 @@
         <button
           class="secondary-btn"
           [disabled]="!selectedMemberId"
-          (click)="openReminderForSelectedMember()">
-          Send Reminder
+          (click)="openSelectedBillingReminderCard()">
+          Reminder Card
         </button>
       </div>
 
       <div *ngIf="memberStatusError" class="error">{{ memberStatusError }}</div>
+    </div>
+
+    <div class="card reminder-panel">
+      <div class="reminder-panel-head">
+        <div>
+          <h3 class="card-title">Billing Reminder Card</h3>
+          <p>Preview the reminder snapshot before sending it to the selected member.</p>
+        </div>
+        <span
+          class="renewal-pill"
+          [class.soon]="isExpiringSoon(displayedRenewalDate)"
+          [class.expired]="isExpired(displayedRenewalDate)">
+          {{ getDaysRemainingLabel(displayedRenewalDate) }}
+        </span>
+      </div>
+
+      <div
+        #billingReminderSnapshot
+        class="billing-reminder-card"
+        [class.overdue]="isExpired(displayedRenewalDate)">
+        <div class="reminder-top">
+          <div>
+            <span class="reminder-eyebrow">
+              {{ isExpired(displayedRenewalDate) ? 'Billing Overdue' : 'Billing Due Soon' }}
+            </span>
+            <h3>{{ selectedMember?.fullName || 'Select Member' }}</h3>
+            <p>{{ selectedMember?.email || '-' }}</p>
+            <p *ngIf="selectedMember?.phone">{{ selectedMember.phone }}</p>
+          </div>
+        </div>
+
+        <div class="reminder-amount">
+          <span>Pending Amount</span>
+          <strong>{{ formatCurrency(totalPending) }}</strong>
+          <small>{{ pendingAmountSource }}</small>
+        </div>
+
+        <div class="reminder-grid">
+          <div>
+            <span>Renewal Date</span>
+            <strong>{{ formatDate(displayedRenewalDate) }}</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <strong>{{ getDaysRemainingLabel(displayedRenewalDate) }}</strong>
+          </div>
+          <div>
+            <span>Plan</span>
+            <strong>{{ selectedPlanName }}</strong>
+          </div>
+          <div>
+            <span>Active Since</span>
+            <strong>{{ formatDate(displayedActiveSince) }}</strong>
+          </div>
+        </div>
+
+        <div class="reminder-payment" *ngIf="billingUpiId || billingQrImageUrl">
+          <div>
+            <span>Payment Details</span>
+            <strong *ngIf="billingUpiId">{{ billingUpiId }}</strong>
+            <p>Scan the QR code or use the UPI ID to complete the renewal payment.</p>
+          </div>
+          <img
+            *ngIf="billingQrImageUrl"
+            [src]="billingQrImageUrl"
+            alt="UPI QR code"
+            class="reminder-qr" />
+        </div>
+
+        <div class="reminder-note">
+          Hi {{ selectedMember?.fullName || 'there' }}, your membership renewal is pending.
+          Please clear the due amount of {{ formatCurrency(totalPending) }} to continue your coaching plan.
+          <span *ngIf="billingUpiId">UPI ID: {{ billingUpiId }}.</span>
+        </div>
+      </div>
+
+      <div class="reminder-actions">
+        <button
+          class="primary-btn"
+          [disabled]="!selectedMember || sendingBillingReminderWhatsApp"
+          (click)="sendBillingReminderWhatsApp()">
+          {{ sendingBillingReminderWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+        </button>
+        <button class="secondary-btn" [disabled]="!selectedMember" (click)="downloadBillingReminderCard()">
+          Download Card
+        </button>
+        <button class="secondary-btn" [disabled]="!selectedMember" (click)="copyBillingReminderMessage()">
+          Copy Message
+        </button>
+        <button class="secondary-btn" [disabled]="!selectedMember" (click)="openBillingReminderInNotifications()">
+          Open Notifications
+        </button>
+      </div>
+
+      <div *ngIf="billingReminderStatus" class="info-text">{{ billingReminderStatus }}</div>
     </div>
 
     <div class="card full-width">
@@ -225,7 +321,7 @@
               <button class="secondary-btn" (click)="selectedMemberId = row.id; onMemberChange()">
                 Manage
               </button>
-              <button class="secondary-btn" (click)="openReminderForMember(row)">
+              <button class="secondary-btn" (click)="openBillingReminderCardForMember(row)">
                 Reminder
               </button>
             </td>

@@ -22,6 +22,24 @@ export const routes: Routes = [
             .then(m => m.ActivityEntryComponent)
       },
       { path: 'dashboard', component: DashboardComponent },
+      {
+        path: 'follow-up-center',
+        loadComponent: () =>
+            import('./features/dashboard/pages/follow-up-center/follow-up-center.component')
+            .then(m => m.FollowUpCenterComponent)
+      },
+      {
+        path: 'check-in-center',
+        loadComponent: () =>
+            import('./features/dashboard/pages/check-in-center/check-in-center.component')
+            .then(m => m.CheckInCenterComponent)
+      },
+      {
+        path: 'weekly-consistency-leaderboard',
+        loadComponent: () =>
+            import('./features/dashboard/pages/weekly-consistency-leaderboard/weekly-consistency-leaderboard.component')
+            .then(m => m.WeeklyConsistencyLeaderboardComponent)
+      },
       { path: 'members', component: MemberListComponent },
       {
         path: 'workoutplans',

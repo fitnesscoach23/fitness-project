@@ -1,7 +1,8 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, inject, OnInit, ViewChild } from '@angular/core';
 import { MemberApiService } from '../../../../core/api/member-api.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { BillingApiService } from '../../../../core/api/billing-api.service';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { WorkoutApiService } from '../../../../core/services/workout-api.service';
@@ -83,7 +84,7 @@ type FollowUpSummary = {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
@@ -92,6 +93,7 @@ export class DashboardComponent implements OnInit {
   @ViewChild('billingSnapshot') billingSnapshot?: ElementRef<HTMLElement>;
 
   private readonly dueSoonDays = 7;
+  private readonly router = inject(Router);
 
   totalMembers = 0;
   loading = true;
@@ -295,8 +297,40 @@ export class DashboardComponent implements OnInit {
     return this.dueSoonMembers.length;
   }
 
+  get reEngagementNeededCount(): number {
+    return this.followUpSummary.reEngagementNeeded;
+  }
+
   get followUpAttentionCount(): number {
     return this.followUpRows.length;
+  }
+
+  get recentDashboardAlerts(): { title: string; meta: string; route: string; tone: string }[] {
+    const followUps = this.followUpRows.slice(0, 2).map((row) => ({
+      title: row.fullName,
+      meta: `${row.statusLabel} - ${this.getDaysSinceActivityLabel(row.daysSinceActivity)} since activity`,
+      route: '/follow-up-center',
+      tone: this.getFollowUpStatusClass(row.status)
+    }));
+
+    const checkins = this.checkinReminderRows
+      .filter((member) => member.cadenceConfigured && member.daysUntilDue <= 0)
+      .slice(0, 2)
+      .map((member) => ({
+        title: member.fullName,
+        meta: `Check-in ${this.getCheckinDueLabel(member.daysUntilDue).toLowerCase()}`,
+        route: '/check-in-center',
+        tone: 'checkin'
+      }));
+
+    const billing = this.dueSoonMembers.slice(0, 2).map((member) => ({
+      title: member.fullName,
+      meta: `${this.getBillingAttentionLabel(member.daysRemaining)} - ${this.formatCurrency(member.totalPending)}`,
+      route: '/billing',
+      tone: this.isOverdue(member.daysRemaining) ? 'reengagement' : 'recommended'
+    }));
+
+    return [...followUps, ...checkins, ...billing].slice(0, 5);
   }
 
   getTrendSymbol(trend: FollowUpRequiredRow['trend']): string {
@@ -319,7 +353,10 @@ export class DashboardComponent implements OnInit {
   }
 
   viewFollowUpMember(row: FollowUpRequiredRow): void {
-    window.location.href = `/members/${row.id}`;
+    const memberId = row?.id || (row as any)?.memberId || (row as any)?._id;
+    if (!memberId) return;
+
+    this.router.navigate(['/members', memberId]);
   }
 
   generateFollowUpMessage(row: FollowUpRequiredRow): void {

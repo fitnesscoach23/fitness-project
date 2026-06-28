@@ -1,0 +1,32 @@
+.center-page .follow-up-widget {
+  min-height: 0;
+}
+
+.sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.sort-header:hover {
+  color: var(--text-primary);
+}
+
+.sort-header span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  color: var(--primary);
+  font-size: 13px;
+}

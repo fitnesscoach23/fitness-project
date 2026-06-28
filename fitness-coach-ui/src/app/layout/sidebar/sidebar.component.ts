@@ -12,14 +12,15 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 export class SidebarComponent {
   readonly navItems = [
     { label: 'Dashboard', route: '/dashboard', icon: 'D' },
-    { label: 'Activity Entry', route: '/dashboard/activity-entry', icon: 'A' },
     { label: 'Members', route: '/members', icon: 'M' },
     { label: 'Workout Plan', route: '/plans/workouts/create', icon: 'W' },
-    { label: 'Exercise Library', route: '/exercise-library', icon: 'E' },
-    { label: 'Diet Library', route: '/diet-library', icon: 'L' },
-    { label: 'Notifications', route: '/notifications', icon: 'N' },
     { label: 'Diet Plan', route: '/plans/diets/create', icon: 'P' },
+    { label: 'Follow-Up Center', route: '/follow-up-center', icon: 'F' },
+    { label: 'Check-In Center', route: '/check-in-center', icon: 'C' },
+    { label: 'Leaderboard', route: '/weekly-consistency-leaderboard', icon: '3' },
     { label: 'Billing', route: '/billing', icon: 'B' },
-    { label: 'Checkin', route: '/checkins/create', icon: 'C' }
+    { label: 'Notifications', route: '/notifications', icon: 'N' },
+    { label: 'Exercise Library', route: '/exercise-library', icon: 'E' },
+    { label: 'Diet Library', route: '/diet-library', icon: 'L' }
   ];
 }

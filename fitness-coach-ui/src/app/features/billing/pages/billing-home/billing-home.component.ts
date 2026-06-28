@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { BillingApiService } from '../../../../core/api/billing-api.service';
 import { MemberApiService, MemberStatus } from '../../../../core/api/member-api.service';
+import { NotificationApiService } from '../../../../core/api/notification-api.service';
+import { environment } from '../../../../../environments/environment';
 
 declare const Razorpay: any;
 
@@ -21,6 +23,7 @@ type BillingRow = {
   renewalDate: string;
   totalPaid: number;
   totalPending: number;
+  amountSource: string;
 };
 
 @Component({
@@ -31,6 +34,8 @@ type BillingRow = {
   styleUrls: ['./billing-home.component.scss']
 })
 export class BillingHomeComponent implements OnInit {
+  @ViewChild('billingReminderSnapshot') billingReminderSnapshot?: ElementRef<HTMLElement>;
+
   private readonly expirySoonDays = 7;
   members: any[] = [];
   membersLoading = true;
@@ -61,6 +66,7 @@ export class BillingHomeComponent implements OnInit {
 
   totalPaid = 0;
   totalPending = 0;
+  pendingAmountSource = 'No amount found';
 
   overrideActiveSince = '';
   overrideRenewalDate = '';
@@ -70,10 +76,13 @@ export class BillingHomeComponent implements OnInit {
   memberStatusUpdating = false;
   memberStatusError: string | null = null;
   manualPaymentDate = new Date().toISOString().slice(0, 10);
+  billingReminderStatus = '';
+  sendingBillingReminderWhatsApp = false;
 
   constructor(
     private memberApi: MemberApiService,
     private billingApi: BillingApiService,
+    private notificationApi: NotificationApiService,
     private router: Router
   ) {}
 
@@ -91,6 +100,18 @@ export class BillingHomeComponent implements OnInit {
 
   get selectedMemberSystemStatus(): 'ACTIVE' | 'INACTIVE' {
     return this.selectedMember?.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
+  }
+
+  get selectedPlanName(): string {
+    return this.subscription?.planName || 'No Plan';
+  }
+
+  get billingUpiId(): string {
+    return environment.billingUpiId?.trim() || '';
+  }
+
+  get billingQrImageUrl(): string {
+    return environment.billingQrImageUrl?.trim() || '';
   }
 
   loadMembers(): void {
@@ -194,9 +215,7 @@ export class BillingHomeComponent implements OnInit {
           const totalPaid = (payments || [])
             .filter((p: any) => p.status === 'SUCCESS')
             .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-          const totalPending = (payments || [])
-            .filter((p: any) => p.status === 'PENDING')
-            .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+          const pendingSummary = this.getPendingAmountSummary(member.id, latestSubscription, payments || []);
 
           return {
             id: member.id,
@@ -207,7 +226,8 @@ export class BillingHomeComponent implements OnInit {
             renewalDate: this.resolveRenewalDate(member.id, latestSubscription),
             memberStatus: member.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
             totalPaid,
-            totalPending
+            totalPending: pendingSummary.amount,
+            amountSource: pendingSummary.source
           } as BillingRow;
         })
       )
@@ -482,9 +502,13 @@ export class BillingHomeComponent implements OnInit {
       .filter((p) => p.status === 'SUCCESS')
       .reduce((sum, p) => sum + p.amount, 0);
 
-    this.totalPending = this.payments
-      .filter((p) => p.status === 'PENDING')
-      .reduce((sum, p) => sum + p.amount, 0);
+    const pendingSummary = this.getPendingAmountSummary(
+      this.selectedMemberId,
+      this.subscription,
+      this.payments
+    );
+    this.totalPending = pendingSummary.amount;
+    this.pendingAmountSource = pendingSummary.source;
   }
 
   openMemberProfile(memberId: string): void {
@@ -525,6 +549,115 @@ export class BillingHomeComponent implements OnInit {
     });
   }
 
+  openSelectedBillingReminderCard(): void {
+    this.billingReminderStatus = 'Reminder card opened for review.';
+  }
+
+  openBillingReminderCardForMember(row: BillingRow): void {
+    this.selectedMemberId = row.id;
+    this.onMemberChange();
+    this.billingReminderStatus = 'Reminder card opened for review.';
+  }
+
+  getBillingReminderSubject(): string {
+    if (!this.selectedMember) return '';
+    const status = this.isExpired(this.displayedRenewalDate) ? 'Billing Overdue' : 'Billing Due Soon';
+    return `${status} - ${this.selectedMember.fullName}`;
+  }
+
+  getBillingReminderMessage(): string {
+    if (!this.selectedMember) return '';
+
+    const [firstName, amount, renewalDate, upiId] = this.getBillingTemplateParameters();
+
+    return `Hello ${firstName},\nThis is a billing reminder from TrainWithVarun. Your membership renewal is pending. Please clear the due amount of ${amount} to continue your coaching plan.\n\nRenewal date: ${renewalDate}.\n\nYou can pay via UPI ID: ${upiId}. Please review the attached billing snapshot and payment details.`;
+  }
+
+  openBillingReminderInNotifications(): void {
+    if (!this.selectedMember) return;
+
+    this.router.navigate(['/notifications'], {
+      queryParams: {
+        memberId: this.selectedMember.id,
+        channel: 'EMAIL',
+        type: 'PAYMENT_REMINDER',
+        recipient: this.selectedMember.email || '',
+        subject: this.getBillingReminderSubject(),
+        message: this.getBillingReminderMessage()
+      }
+    });
+  }
+
+  async copyBillingReminderMessage(): Promise<void> {
+    const message = this.getBillingReminderMessage();
+    if (!message) return;
+
+    try {
+      await navigator.clipboard.writeText(message);
+      this.billingReminderStatus = 'Reminder message copied.';
+    } catch {
+      this.billingReminderStatus = 'Could not copy message in this browser.';
+    }
+  }
+
+  async downloadBillingReminderCard(): Promise<void> {
+    if (!this.selectedMember) return;
+
+    this.billingReminderStatus = 'Preparing screenshot...';
+
+    try {
+      const imageDataUrl = await this.captureElementAsImageDataUrl(this.billingReminderSnapshot?.nativeElement);
+      const link = document.createElement('a');
+      link.download = `${this.slugify(this.selectedMember.fullName)}-billing-reminder.png`;
+      link.href = imageDataUrl;
+      link.click();
+      this.billingReminderStatus = 'Reminder card downloaded.';
+    } catch {
+      this.billingReminderStatus = 'Could not create reminder card screenshot.';
+    }
+  }
+
+  async sendBillingReminderWhatsApp(): Promise<void> {
+    if (!this.selectedMember || this.sendingBillingReminderWhatsApp) return;
+
+    if (!this.selectedMember.phone) {
+      this.billingReminderStatus = 'Add a phone number before sending WhatsApp.';
+      return;
+    }
+
+    this.sendingBillingReminderWhatsApp = true;
+    this.billingReminderStatus = 'Preparing WhatsApp reminder...';
+
+    try {
+      const imageDataUrl = await this.captureElementAsImageDataUrl(this.billingReminderSnapshot?.nativeElement);
+
+      this.notificationApi.send({
+        memberId: this.selectedMember.id,
+        channel: 'WHATSAPP',
+        type: 'PAYMENT_REMINDER',
+        recipient: this.selectedMember.phone,
+        message: this.getBillingReminderMessage(),
+        templateParameters: this.getBillingTemplateParameters(),
+        imageDataUrl,
+        imageFileName: `${this.slugify(this.selectedMember.fullName)}-billing-reminder.png`
+      }).subscribe({
+        next: (res) => {
+          this.sendingBillingReminderWhatsApp = false;
+          this.billingReminderStatus = res.status === 'SENT'
+            ? 'WhatsApp reminder sent.'
+            : 'WhatsApp send failed. Check notification history.';
+        },
+        error: () => {
+          this.sendingBillingReminderWhatsApp = false;
+          this.billingReminderStatus = 'Could not send WhatsApp reminder.';
+        }
+      });
+    } catch {
+      this.sendingBillingReminderWhatsApp = false;
+      this.billingReminderStatus = 'Could not create reminder card screenshot.';
+    }
+  }
+
   formatDate(value: string): string {
     if (!value || value === '-') return '-';
 
@@ -532,6 +665,14 @@ export class BillingHomeComponent implements OnInit {
     if (Number.isNaN(parsed.getTime())) return value;
 
     return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(parsed);
+  }
+
+  formatCurrency(value: number): string {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(value || 0);
   }
 
   getDaysRemaining(renewalDate: string): number | null {
@@ -647,6 +788,122 @@ export class BillingHomeComponent implements OnInit {
 
   private getTodayDateInput(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  private getPendingAmountSummary(
+    memberId: string,
+    subscription: any,
+    payments: any[]
+  ): { amount: number; source: string } {
+    const snapshotOverride = this.getDashboardBillingSnapshotOverride(memberId);
+    const pendingTotal = (payments || [])
+      .filter((payment: any) => String(payment?.status || '').toUpperCase() === 'PENDING')
+      .reduce((sum: number, payment: any) => sum + (Number(payment.amount) || 0), 0);
+    const successfulPayments = this.getSuccessfulPayments(payments || []);
+    const previousMonthAmount = this.getPreviousMonthSuccessfulAmount(successfulPayments);
+    const latestPaidAmount = this.getLatestSuccessfulPaymentAmount(successfulPayments);
+    const subscriptionAmount = this.getSubscriptionAmount(subscription);
+
+    if (snapshotOverride?.pendingAmount != null) {
+      return { amount: Number(snapshotOverride.pendingAmount) || 0, source: 'Edited' };
+    }
+
+    if (pendingTotal > 0) return { amount: pendingTotal, source: 'Pending payment' };
+    if (latestPaidAmount > 0) return { amount: latestPaidAmount, source: 'Last paid amount' };
+    if (previousMonthAmount > 0) return { amount: previousMonthAmount, source: 'Last month paid' };
+    if (subscriptionAmount > 0) return { amount: subscriptionAmount, source: 'Plan amount' };
+
+    return { amount: 0, source: 'No amount found' };
+  }
+
+  private getDashboardBillingSnapshotOverride(memberId: string): any | null {
+    const raw = localStorage.getItem(`dashboard_billing_snapshot_override_${memberId}`);
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  private getSuccessfulPayments(payments: any[]): any[] {
+    return payments.filter((payment: any) =>
+      String(payment?.status || '').toUpperCase() === 'SUCCESS'
+    );
+  }
+
+  private getPreviousMonthSuccessfulAmount(successfulPayments: any[]): number {
+    const target = new Date();
+    target.setMonth(target.getMonth() - 1);
+    const targetMonth = target.getMonth();
+    const targetYear = target.getFullYear();
+
+    return successfulPayments
+      .filter((payment: any) => {
+        const parsed = new Date(payment.paymentDate || payment.createdAt || payment.updatedAt);
+        return !Number.isNaN(parsed.getTime())
+          && parsed.getMonth() === targetMonth
+          && parsed.getFullYear() === targetYear;
+      })
+      .reduce((sum: number, payment: any) => sum + (Number(payment.amount) || 0), 0);
+  }
+
+  private getLatestSuccessfulPaymentAmount(successfulPayments: any[]): number {
+    const latestPayment = [...successfulPayments]
+      .sort((a: any, b: any) => {
+        const first = new Date(a.paymentDate || a.createdAt || a.updatedAt).getTime() || 0;
+        const second = new Date(b.paymentDate || b.createdAt || b.updatedAt).getTime() || 0;
+        return second - first;
+      })[0] || null;
+
+    return Number(latestPayment?.amount) || 0;
+  }
+
+  private getSubscriptionAmount(subscription: any): number {
+    return Number(
+      subscription?.amount
+      || subscription?.price
+      || subscription?.monthlyAmount
+      || subscription?.planAmount
+      || 0
+    );
+  }
+
+  private getBillingTemplateParameters(): string[] {
+    return [
+      this.getFirstName(this.selectedMember?.fullName),
+      this.formatCurrency(this.totalPending),
+      this.formatDate(this.displayedRenewalDate),
+      this.billingUpiId || '-'
+    ];
+  }
+
+  private async captureElementAsImageDataUrl(element?: HTMLElement): Promise<string> {
+    if (!element) {
+      throw new Error('Missing screenshot element');
+    }
+
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: Math.min(window.devicePixelRatio || 1, 2),
+      useCORS: true
+    });
+
+    return canvas.toDataURL('image/png');
+  }
+
+  private getFirstName(value: string): string {
+    return String(value || 'there').trim().split(/\s+/)[0] || 'there';
+  }
+
+  private slugify(value: string): string {
+    return String(value || 'member')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'member';
   }
 
   private getRenewalDateForManualPayment(): string {

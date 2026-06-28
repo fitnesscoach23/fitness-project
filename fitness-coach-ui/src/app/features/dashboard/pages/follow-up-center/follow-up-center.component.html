@@ -1,0 +1,124 @@
+<div class="dashboard center-page">
+  <div class="dashboard-header">
+    <h1 class="dashboard-title">Follow-Up Center</h1>
+    <p class="dashboard-subtitle">
+      Prioritize members who need coach attention based on consistency and recent activity.
+    </p>
+  </div>
+
+  <div class="dashboard-section follow-up-widget">
+    <div class="section-head follow-up-widget-head">
+      <div>
+        <h2>Follow-Up Required</h2>
+        <p>Review priority, generate a message, and send the follow-up from one place.</p>
+      </div>
+      <span>{{ followUpAttentionCount }} need attention</span>
+    </div>
+
+    <div class="follow-up-summary-grid">
+      <div class="follow-up-summary-card track">
+        <span>Members On Track</span>
+        <strong>{{ followUpSummary.onTrack }}</strong>
+      </div>
+      <div class="follow-up-summary-card checkin">
+        <span>Need Check-In</span>
+        <strong>{{ followUpSummary.needsCheckIn }}</strong>
+      </div>
+      <div class="follow-up-summary-card recommended">
+        <span>Need Follow-Up</span>
+        <strong>{{ followUpSummary.followUpRecommended }}</strong>
+      </div>
+      <div class="follow-up-summary-card reengagement">
+        <span>Re-engagement Needed</span>
+        <strong>{{ followUpSummary.reEngagementNeeded }}</strong>
+      </div>
+    </div>
+
+    <div class="follow-up-table-card">
+      <div *ngIf="followUpLoading" class="due-state">Loading follow-up priorities...</div>
+
+      <div *ngIf="!followUpLoading && !followUpRows.length" class="due-state">
+        No members need follow-up right now.
+      </div>
+
+      <div class="follow-up-table-wrap" *ngIf="!followUpLoading && followUpRows.length">
+        <table class="follow-up-table">
+          <thead>
+            <tr>
+              <th>
+                <button type="button" class="sort-header" (click)="sortBy('fullName')" [attr.aria-label]="getSortLabel('fullName') + ' by member name'">
+                  Member Name <span>{{ getSortIndicator('fullName') }}</span>
+                </button>
+              </th>
+              <th>
+                <button type="button" class="sort-header" (click)="sortBy('weeklyScore')" [attr.aria-label]="getSortLabel('weeklyScore') + ' by weekly score'">
+                  Weekly Score <span>{{ getSortIndicator('weeklyScore') }}</span>
+                </button>
+              </th>
+              <th>
+                <button type="button" class="sort-header" (click)="sortBy('trend')" [attr.aria-label]="getSortLabel('trend') + ' by trend'">
+                  Trend <span>{{ getSortIndicator('trend') }}</span>
+                </button>
+              </th>
+              <th>
+                <button type="button" class="sort-header" (click)="sortBy('daysSinceActivity')" [attr.aria-label]="getSortLabel('daysSinceActivity') + ' by days since activity'">
+                  Days Since Activity <span>{{ getSortIndicator('daysSinceActivity') }}</span>
+                </button>
+              </th>
+              <th>
+                <button type="button" class="sort-header" (click)="sortBy('status')" [attr.aria-label]="getSortLabel('status') + ' by follow-up status'">
+                  Follow-Up Status <span>{{ getSortIndicator('status') }}</span>
+                </button>
+              </th>
+              <th>
+                <button type="button" class="sort-header" (click)="sortBy('lastActivityDate')" [attr.aria-label]="getSortLabel('lastActivityDate') + ' by last activity date'">
+                  Last Activity Date <span>{{ getSortIndicator('lastActivityDate') }}</span>
+                </button>
+              </th>
+              <th>Quick Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of sortedFollowUpRows">
+              <td>
+                <strong>{{ row.fullName }}</strong>
+                <small *ngIf="row.sendStatus">{{ row.sendStatus }}</small>
+              </td>
+              <td>{{ row.weeklyScore }}/100</td>
+              <td>
+                <span class="follow-up-trend" [ngClass]="row.trend">
+                  {{ getTrendSymbol(row.trend) }}
+                </span>
+              </td>
+              <td>{{ getDaysSinceActivityLabel(row.daysSinceActivity) }}</td>
+              <td>
+                <span class="follow-up-badge" [ngClass]="getFollowUpStatusClass(row.status)">
+                  {{ row.statusLabel }}
+                </span>
+              </td>
+              <td>{{ formatDate(row.lastActivityDate) }}</td>
+              <td>
+                <div class="follow-up-actions">
+                  <button type="button" class="secondary-action" (click)="viewFollowUpMember(row)">View Member</button>
+                  <button type="button" class="secondary-action" (click)="generateFollowUpMessage(row)">Generate Message</button>
+                  <button
+                    type="button"
+                    class="primary-action"
+                    [disabled]="row.sending"
+                    (click)="sendFollowUpWhatsApp(row)">
+                    {{ row.sending ? 'Sending...' : 'Send WhatsApp' }}
+                  </button>
+                </div>
+                <textarea
+                  *ngIf="row.generatedMessage"
+                  rows="3"
+                  [(ngModel)]="row.generatedMessage"
+                  class="follow-up-message"></textarea>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

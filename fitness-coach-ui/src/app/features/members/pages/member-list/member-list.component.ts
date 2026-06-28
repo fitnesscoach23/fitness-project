@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { MemberApiService } from '../../../../core/api/member-api.service';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 @Component({
