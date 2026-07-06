@@ -15,6 +15,8 @@ public record UpsertDailyMemberCheckInRequest(
         Boolean travelWorkout,
         Boolean recoveryDay,
         Boolean activeOther,
+        Boolean workoutVideoNotShared,
+        Boolean stepsRecordNotShared,
         Boolean notActive,
         String notes
 ) {

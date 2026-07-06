@@ -258,8 +258,12 @@ public class WorkoutService {
     @Transactional
     public void deleteDay(String coachEmail, UUID dayId) {
 
-        WorkoutDay day = dayRepo.findById(dayId)
-                .orElseThrow(() -> new RuntimeException("Day not found"));
+        Optional<WorkoutDay> maybeDay = dayRepo.findById(dayId);
+        if (maybeDay.isEmpty()) {
+            return;
+        }
+
+        WorkoutDay day = maybeDay.get();
 
         // ownership check
         assertOwnedPlan(coachEmail, day.getPlanId());

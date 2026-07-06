@@ -442,7 +442,7 @@ private mapPlanToGrid(plan: any) {
     });
   });
 
-  this.gridRows = rows;
+  this.gridRows = this.dedupeGridRows(rows);
 }
 
 get hasExistingPlan(): boolean {
@@ -468,7 +468,7 @@ private mapPlanToGridLocal(plan: any): WorkoutGridRow[] {
     });
   });
 
-  return rows;
+  return this.dedupeGridRows(rows);
 }
 
 enableEdit(plan: any) {
@@ -538,6 +538,7 @@ private groupGrid(rows: WorkoutGridRow[]) {
 }
 
 savePlan(plan: any) {
+  plan.gridRows = this.dedupeGridRows(plan.gridRows);
 
   if (!this.validateGrid(plan.gridRows)) {
     alert('Please fill Day, Exercise, Set Number and Reps for all rows.');
@@ -811,7 +812,7 @@ private rebuildPlanFromGrid(
   rows: WorkoutGridRow[]
 ): Observable<void> {
 
-  const dayMap = this.groupGrid(rows);
+  const dayMap = this.groupGrid(this.dedupeGridRows(rows));
   let chain$: Observable<void> = of(void 0);
 
   dayMap.forEach((exerciseMap, dayName) => {
@@ -1088,6 +1089,31 @@ private hasWorkoutRowValue(row: WorkoutGridRow): boolean {
     row.videoUrl?.trim() ||
     row.setNumber != null
   );
+}
+
+private dedupeGridRows(rows: WorkoutGridRow[]): WorkoutGridRow[] {
+  const seen = new Set<string>();
+  const deduped: WorkoutGridRow[] = [];
+
+  rows.forEach((row) => {
+    const normalized: WorkoutGridRow = {
+      dayName: (row.dayName || '').trim(),
+      exerciseName: (row.exerciseName || '').trim(),
+      muscleGroup: (row.muscleGroup || '').trim(),
+      musclesTrained: (row.musclesTrained || '').trim(),
+      setNumber: row.setNumber == null ? null : Number(row.setNumber),
+      reps: (row.reps || '').trim(),
+      videoUrl: this.normalizeVideoUrl(row.videoUrl)
+    };
+    const key = JSON.stringify(normalized).toLowerCase();
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(normalized);
+    }
+  });
+
+  return deduped;
 }
 
 }

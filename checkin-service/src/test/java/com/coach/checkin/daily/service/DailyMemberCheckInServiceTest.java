@@ -62,7 +62,7 @@ class DailyMemberCheckInServiceTest {
 
         DailyMemberCheckInDayResponse response = service.upsert(
                 "coach@test.com",
-                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, true, 9000, true, false, false, false, false, "Strong day")
+                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, true, 9000, true, false, false, false, false, false, false, "Strong day")
         );
 
         ArgumentCaptor<DailyMemberCheckIn> captor = ArgumentCaptor.forClass(DailyMemberCheckIn.class);
@@ -78,6 +78,8 @@ class DailyMemberCheckInServiceTest {
         assertTrue(response.active());
         assertTrue(response.exerciseDone());
         assertTrue(response.stepTargetAchieved());
+        assertFalse(response.workoutVideoNotShared());
+        assertFalse(response.stepsRecordNotShared());
         assertNotNull(response.id());
     }
 
@@ -103,13 +105,15 @@ class DailyMemberCheckInServiceTest {
 
         DailyMemberCheckInDayResponse response = service.upsert(
                 "coach@test.com",
-                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, false, 0, false, false, true, false, false, "Rest day")
+                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, false, 0, false, false, true, false, true, true, false, "Rest day")
         );
 
         assertEquals(existingId, response.id());
         assertFalse(response.exerciseDone());
         assertTrue(response.active());
         assertTrue(response.recoveryDay());
+        assertTrue(response.workoutVideoNotShared());
+        assertTrue(response.stepsRecordNotShared());
         assertEquals(0, response.stepsCount());
         assertEquals("Rest day", response.notes());
     }

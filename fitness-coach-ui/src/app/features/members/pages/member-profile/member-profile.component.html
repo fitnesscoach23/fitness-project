@@ -365,6 +365,14 @@
           <label>Fats (g)</label>
           <input type="number" [(ngModel)]="bodyMetrics.fatsGrams" (ngModelChange)="onBodyMetricInput('fatsGrams')" />
         </div>
+        <div class="metrics-field">
+          <label>Calories</label>
+          <input
+            type="number"
+            [ngModel]="bodyMetrics.macroCalories"
+            disabled
+            class="readonly-input" />
+        </div>
       </div>
 
       <div class="metrics-reference">
@@ -846,6 +854,13 @@
             (click)="applyComparisonEnhancementPreset('defined')">
             Defined
           </button>
+          <button
+            type="button"
+            class="secondary-btn"
+            [class.active]="comparisonEnhancementPreset === 'stage'"
+            (click)="applyComparisonEnhancementPreset('stage')">
+            Stage
+          </button>
         </div>
 
         <div class="comparison-slider-grid">
@@ -854,7 +869,7 @@
             <input
               type="range"
               min="85"
-              max="140"
+              max="150"
               step="1"
               [(ngModel)]="comparisonEnhancement.contrast"
               (ngModelChange)="onComparisonEnhancementChanged()" />
@@ -884,7 +899,7 @@
             <input
               type="range"
               min="0"
-              max="20"
+              max="28"
               step="1"
               [(ngModel)]="comparisonEnhancement.clarity"
               (ngModelChange)="onComparisonEnhancementChanged()" />

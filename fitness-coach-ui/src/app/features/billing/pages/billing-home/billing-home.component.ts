@@ -561,7 +561,7 @@ export class BillingHomeComponent implements OnInit {
 
   getBillingReminderSubject(): string {
     if (!this.selectedMember) return '';
-    const status = this.isExpired(this.displayedRenewalDate) ? 'Billing Overdue' : 'Billing Due Soon';
+    const status = this.getBillingReminderStatusLabel(this.displayedRenewalDate);
     return `${status} - ${this.selectedMember.fullName}`;
   }
 
@@ -704,6 +704,12 @@ export class BillingHomeComponent implements OnInit {
   isExpired(renewalDate: string): boolean {
     const days = this.getDaysRemaining(renewalDate);
     return days != null && days < 0;
+  }
+
+  getBillingReminderStatusLabel(renewalDate: string): string {
+    if (this.isExpired(renewalDate)) return 'Billing Overdue';
+    if (this.isExpiringSoon(renewalDate)) return 'Billing Due Soon';
+    return 'Billing Upcoming';
   }
 
   setMemberStatus(memberId: string, status: 'ACTIVE' | 'INACTIVE') {

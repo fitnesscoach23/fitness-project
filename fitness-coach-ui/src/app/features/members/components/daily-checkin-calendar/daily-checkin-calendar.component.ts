@@ -24,6 +24,8 @@ interface DailyCheckinEditor {
   travelWorkout: boolean;
   recoveryDay: boolean;
   activeOther: boolean;
+  workoutVideoNotShared: boolean;
+  stepsRecordNotShared: boolean;
   notActive: boolean;
   stepsCount: number | null;
   notes: string;
@@ -58,6 +60,8 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     { key: 'travelWorkout', label: 'Travel Workout', className: 'travel-workout' },
     { key: 'recoveryDay', label: 'Recovery Day', className: 'recovery-day' },
     { key: 'activeOther', label: 'Active Other', className: 'active-other' },
+    { key: 'workoutVideoNotShared', label: 'Workout Video Not Shared', className: 'workout-video-not-shared' },
+    { key: 'stepsRecordNotShared', label: 'Steps Record Not Shared', className: 'steps-record-not-shared' },
     { key: 'notActive', label: 'Not Active', className: 'not-active' }
   ];
   readonly emptySummary: DailyCheckinSummary = {
@@ -124,6 +128,8 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       travelWorkout: Boolean(cell.entry?.travelWorkout),
       recoveryDay: Boolean(cell.entry?.recoveryDay),
       activeOther: Boolean(cell.entry?.activeOther),
+      workoutVideoNotShared: Boolean(cell.entry?.workoutVideoNotShared),
+      stepsRecordNotShared: Boolean(cell.entry?.stepsRecordNotShared),
       notActive: Boolean(cell.entry?.notActive),
       stepsCount: cell.entry?.stepsCount ?? null,
       notes: cell.entry?.notes || ''
@@ -168,6 +174,8 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       travelWorkout: this.editor.travelWorkout,
       recoveryDay: this.editor.recoveryDay,
       activeOther: this.editor.activeOther,
+      workoutVideoNotShared: this.editor.workoutVideoNotShared,
+      stepsRecordNotShared: this.editor.stepsRecordNotShared,
       notActive: this.editor.notActive,
       stepsCount: Math.max(0, Number(this.editor.stepsCount || 0)),
       notes: this.editor.notes.trim() || null
@@ -213,7 +221,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
 
     forkJoin(dateKeys.map((checkInDate) => {
       const existing = entriesByDate.get(checkInDate);
-      const addingActiveMarker = this.bulkEditor.marker !== 'notActive' && this.bulkEditor.value;
+      const addingActiveMarker = this.isActiveMarker(this.bulkEditor.marker) && this.bulkEditor.value;
       const bulkNotActive = addingActiveMarker
         ? false
         : this.getBulkMarkerValue(existing, 'notActive');
@@ -226,6 +234,8 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       const travelWorkout = bulkNotActive ? false : this.getBulkMarkerValue(existing, 'travelWorkout');
       const recoveryDay = bulkNotActive ? false : this.getBulkMarkerValue(existing, 'recoveryDay');
       const activeOther = bulkNotActive ? false : this.getBulkMarkerValue(existing, 'activeOther');
+      const workoutVideoNotShared = this.getBulkMarkerValue(existing, 'workoutVideoNotShared');
+      const stepsRecordNotShared = this.getBulkMarkerValue(existing, 'stepsRecordNotShared');
       const finalNotActive = bulkNotActive && !exerciseDone && !stepTargetAchieved
         && !travelWorkout
         && !recoveryDay
@@ -242,6 +252,8 @@ export class DailyCheckinCalendarComponent implements OnChanges {
         travelWorkout,
         recoveryDay,
         activeOther,
+        workoutVideoNotShared,
+        stepsRecordNotShared,
         notActive: finalNotActive,
         stepsCount,
         notes: notes || existing?.notes || null
@@ -322,7 +334,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       return;
     }
 
-    if (marker !== 'notActive' && this.editor[marker]) {
+    if (this.isActiveMarker(marker) && this.editor[marker]) {
       this.editor.notActive = false;
     }
   }
@@ -445,5 +457,11 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       return this.bulkEditor.value;
     }
     return Boolean(entry?.[marker]);
+  }
+
+  private isActiveMarker(marker: DailyActivityMarker): boolean {
+    return marker !== 'notActive'
+      && marker !== 'workoutVideoNotShared'
+      && marker !== 'stepsRecordNotShared';
   }
 }

@@ -1,11 +1,16 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { map } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class WorkoutApiService {
 
   constructor(private http: HttpClient) {}
+
+  private normalizeId(value: unknown): string {
+    return String(value ?? '').replace(/^"|"$/g, '');
+  }
 
   getWorkoutPlan(memberId: string) {
     return this.http.get<any>(
@@ -91,20 +96,22 @@ deleteExercise(exerciseId: string) {
 
 
 addWorkoutDay(planId: string, payload: { dayName: string }) {
-  return this.http.post<string>(
+  return this.http.post(
     `${environment.workoutApi}/workouts/${planId}/days`,
-    payload
-  );
+    payload,
+    { responseType: 'text' }
+  ).pipe(map((id) => this.normalizeId(id)));
 }
 
 addExerciseToDay(
   dayId: string,
   payload: { name: string; muscleGroup?: string; musclesTrained?: string; notes?: string; videoUrl?: string }
 ) {
-  return this.http.post<string>(
+  return this.http.post(
     `${environment.workoutApi}/workouts/days/${dayId}/exercises`,
-    payload
-  );
+    payload,
+    { responseType: 'text' }
+  ).pipe(map((id) => this.normalizeId(id)));
 }
 
 addSetToExercise(
@@ -120,8 +127,9 @@ addSetToExercise(
 ) {
   return this.http.post(
     `${environment.workoutApi}/workouts/exercises/${exerciseId}/sets`,
-    payload
-  );
+    payload,
+    { responseType: 'text' }
+  ).pipe(map((id) => this.normalizeId(id)));
 }
 
 

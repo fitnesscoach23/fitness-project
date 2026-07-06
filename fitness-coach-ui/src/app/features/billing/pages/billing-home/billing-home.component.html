@@ -175,11 +175,12 @@
       <div
         #billingReminderSnapshot
         class="billing-reminder-card"
+        [class.soon]="isExpiringSoon(displayedRenewalDate)"
         [class.overdue]="isExpired(displayedRenewalDate)">
         <div class="reminder-top">
           <div>
             <span class="reminder-eyebrow">
-              {{ isExpired(displayedRenewalDate) ? 'Billing Overdue' : 'Billing Due Soon' }}
+              {{ getBillingReminderStatusLabel(displayedRenewalDate) }}
             </span>
             <h3>{{ selectedMember?.fullName || 'Select Member' }}</h3>
             <p>{{ selectedMember?.email || '-' }}</p>

@@ -196,6 +196,12 @@
   border-color: #16a34a;
 }
 
+.legend-dot.workout-video-not-shared,
+.legend-dot.steps-record-not-shared {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -283,6 +289,12 @@
 .day-state {
   background: #e5e7eb;
   color: #374151;
+}
+
+.day-state.workout-video-not-shared,
+.day-state.steps-record-not-shared {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .day-exercise {

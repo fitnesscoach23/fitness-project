@@ -41,6 +41,8 @@ public class DailyMemberCheckInService {
         checkIn.setTravelWorkout(!notActive && Boolean.TRUE.equals(request.travelWorkout()));
         checkIn.setRecoveryDay(!notActive && Boolean.TRUE.equals(request.recoveryDay()));
         checkIn.setActiveOther(!notActive && Boolean.TRUE.equals(request.activeOther()));
+        checkIn.setWorkoutVideoNotShared(Boolean.TRUE.equals(request.workoutVideoNotShared()));
+        checkIn.setStepsRecordNotShared(Boolean.TRUE.equals(request.stepsRecordNotShared()));
         checkIn.setNotActive(notActive);
         checkIn.setNotes(request.notes());
 
@@ -108,6 +110,8 @@ public class DailyMemberCheckInService {
         boolean travelWorkout = Boolean.TRUE.equals(checkIn.getTravelWorkout());
         boolean recoveryDay = Boolean.TRUE.equals(checkIn.getRecoveryDay());
         boolean activeOther = Boolean.TRUE.equals(checkIn.getActiveOther());
+        boolean workoutVideoNotShared = Boolean.TRUE.equals(checkIn.getWorkoutVideoNotShared());
+        boolean stepsRecordNotShared = Boolean.TRUE.equals(checkIn.getStepsRecordNotShared());
         boolean notActive = Boolean.TRUE.equals(checkIn.getNotActive());
         boolean active = Boolean.TRUE.equals(checkIn.getExerciseDone())
                 || stepTargetAchieved
@@ -124,6 +128,8 @@ public class DailyMemberCheckInService {
                 travelWorkout,
                 recoveryDay,
                 activeOther,
+                workoutVideoNotShared,
+                stepsRecordNotShared,
                 notActive,
                 active,
                 checkIn.getNotes(),

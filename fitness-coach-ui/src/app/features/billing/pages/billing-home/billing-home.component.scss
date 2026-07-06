@@ -296,10 +296,14 @@ select:focus {
   display: grid;
   gap: 18px;
   padding: 24px;
-  border: 1px solid #fde68a;
+  border: 1px solid #e5e7eb;
   border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 8px 24px rgba(16, 24, 40, 0.06);
+}
+
+.billing-reminder-card.soon {
+  border-color: #fde68a;
 }
 
 .billing-reminder-card.overdue {
@@ -318,11 +322,16 @@ select:focus {
   min-height: 28px;
   padding: 0 12px;
   border-radius: 999px;
-  background: #fef3c7;
-  color: #92400e;
+  background: #eef2ff;
+  color: #4f46e5;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.soon .reminder-eyebrow {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .overdue .reminder-eyebrow {

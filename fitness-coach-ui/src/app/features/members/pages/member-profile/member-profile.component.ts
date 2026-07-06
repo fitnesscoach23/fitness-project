@@ -45,7 +45,7 @@ type BodyMetricSourceField =
   | 'fatsGrams'
   | 'auto';
 
-type ComparisonEnhancementPreset = 'natural' | 'sharp' | 'defined' | 'custom';
+type ComparisonEnhancementPreset = 'natural' | 'sharp' | 'defined' | 'stage' | 'custom';
 type DietPlanTotals = { calories: number | null; protein: number | null; carbs: number | null; fats: number | null };
 type DietItemViewModel = any & {
   displayFoodName: string;
@@ -162,12 +162,12 @@ export class MemberProfileComponent implements OnInit {
   capturingComparison = false;
   sendingComparisonWhatsApp = false;
   comparisonWhatsAppMessage: string | null = null;
-  comparisonEnhancementPreset: ComparisonEnhancementPreset = 'sharp';
+  comparisonEnhancementPreset: ComparisonEnhancementPreset = 'stage';
   comparisonEnhancement = {
-    contrast: 112,
-    brightness: 103,
-    saturate: 106,
-    clarity: 8
+    contrast: 130,
+    brightness: 94,
+    saturate: 112,
+    clarity: 18
   };
   activeSection: 'overview' | 'bodyMetrics' | 'billing' | 'progress' | 'dailyConsistency' | 'workout' | 'diet' = 'overview';
   totalPaid = 0;
@@ -215,7 +215,8 @@ export class MemberProfileComponent implements OnInit {
     targetCalories: null as number | null,
     proteinGrams: null as number | null,
     carbsGrams: null as number | null,
-    fatsGrams: null as number | null
+    fatsGrams: null as number | null,
+    macroCalories: null as number | null
   };
 
   readonly activityOptions = [
@@ -493,6 +494,7 @@ export class MemberProfileComponent implements OnInit {
     this.bodyMetrics.proteinGrams = this.toNumberOrNull(source.proteinGrams);
     this.bodyMetrics.carbsGrams = this.toNumberOrNull(source.carbsGrams);
     this.bodyMetrics.fatsGrams = this.toNumberOrNull(source.fatsGrams);
+    this.updateMacroCalories();
   }
 
   initializeBodyMetrics() {
@@ -515,7 +517,10 @@ export class MemberProfileComponent implements OnInit {
   }
 
   onBodyMetricInput(field: BodyMetricSourceField) {
-    if (!this.bodyMetricsAutoCalc) return;
+    if (!this.bodyMetricsAutoCalc) {
+      this.updateMacroCalories();
+      return;
+    }
     this.recalculateBodyMetrics(field);
   }
 
@@ -542,6 +547,7 @@ export class MemberProfileComponent implements OnInit {
       this.bodyMetrics.proteinGrams = null;
       this.bodyMetrics.carbsGrams = null;
       this.bodyMetrics.fatsGrams = null;
+      this.bodyMetrics.macroCalories = null;
       return;
     }
 
@@ -645,6 +651,31 @@ export class MemberProfileComponent implements OnInit {
     this.bodyMetrics.proteinGrams = this.roundTo(proteinGrams, 0);
     this.bodyMetrics.carbsGrams = this.roundTo(carbsGrams, 0);
     this.bodyMetrics.fatsGrams = this.roundTo(fatsGrams, 0);
+    this.updateMacroCalories();
+  }
+
+  private updateMacroCalories(): void {
+    this.bodyMetrics.macroCalories = this.calculateMacroCalories(
+      this.bodyMetrics.proteinGrams,
+      this.bodyMetrics.carbsGrams,
+      this.bodyMetrics.fatsGrams
+    );
+  }
+
+  private calculateMacroCalories(
+    proteinGrams: number | null | undefined,
+    carbsGrams: number | null | undefined,
+    fatsGrams: number | null | undefined
+  ): number | null {
+    const protein = this.toNumberOrNull(proteinGrams);
+    const carbs = this.toNumberOrNull(carbsGrams);
+    const fats = this.toNumberOrNull(fatsGrams);
+
+    if (protein == null && carbs == null && fats == null) {
+      return null;
+    }
+
+    return this.roundTo(((protein ?? 0) * 4) + ((carbs ?? 0) * 4) + ((fats ?? 0) * 9), 0);
   }
 
   onGoalChange() {
@@ -1790,35 +1821,73 @@ generateCoachFeedback(
 ): string {
   if (!current) return '';
 
-  const messages: string[] = [];
+  const feedbackMessages = [this.getWeeklyFeedbackScoreTemplate(current.score)];
+  const improvementArea = this.getWeeklyFeedbackImprovementArea(current);
+  const trendMessage = previous ? this.getWeeklyFeedbackTrendMessage(trend) : '';
 
-  if (current.score >= 90) {
-    messages.push('Excellent work this week! You stayed highly consistent with your workouts and steps. Keep maintaining this momentum next week. 🔥');
-  } else if (current.score >= 80) {
-    messages.push('Good work this week 👍 You are staying consistent overall. The main focus next week is to improve the weaker area and push the score above 90.');
-  } else if (current.score >= 70) {
-    messages.push('Decent effort this week. You are moving in the right direction, but there is room to improve consistency. Let’s focus on completing planned workouts and hitting steps more regularly.');
-  } else {
-    messages.push('Consistency was below target this week. Before changing the plan, let’s focus on completing workouts and improving daily activity. Small actions done consistently will drive results.');
+  if (improvementArea && trendMessage) {
+    feedbackMessages.push(this.combineWeeklyFeedbackNotes(improvementArea, trendMessage));
+  } else if (improvementArea) {
+    feedbackMessages.push(improvementArea);
+  } else if (trendMessage) {
+    feedbackMessages.push(trendMessage);
   }
 
-  if (previous) {
-    if (trend === 'declining') {
-      messages.push('Your score has dropped compared to last week, so let’s identify what affected consistency and improve next week.');
-    } else if (trend === 'improving') {
-      messages.push('Great improvement compared to last week. Keep building on this progress.');
-    }
+  return feedbackMessages.join(' ');
+}
+
+private getWeeklyFeedbackScoreTemplate(score: number): string {
+  if (score >= 90) {
+    return 'Outstanding consistency this week! \u{1F44F} You followed the plan really well. Keep building on this momentum and aim to maintain the same standard next week. \u{1F4AA}';
   }
 
-  if (current.workoutCompliance < 80) {
-    messages.push('Priority: Complete all scheduled workouts.');
+  if (score >= 80) {
+    return 'Good progress this week! \u{1F44D} You are staying consistent overall. Focus on improving the few missed workouts or step targets to push your score above 90 next week.';
   }
 
-  if (current.stepsCompliance < 80) {
-    messages.push('Priority: Improve daily step count consistency.');
+  if (score >= 60) {
+    return 'Decent effort this week, but there is room for improvement. Let\u2019s focus on completing planned workouts and hitting daily step targets more consistently next week. \u{1F44A}';
   }
 
-  return messages.join(' ');
+  if (score >= 40) {
+    return 'This week was below your potential, but one week does not define your progress. Let\u2019s identify what got in the way and build momentum again with small consistent actions. \u{1F4AA}';
+  }
+
+  return 'Consistency was difficult this week, and that is okay. Let\u2019s reconnect, understand the challenges, and take one small step at a time to get back on track. \u{1F91D}';
+}
+
+private getWeeklyFeedbackImprovementArea(current: WeeklyConsistencyScore): string {
+  if (current.workoutCompliance < current.stepsCompliance) {
+    return 'Priority for next week: complete your planned workouts.';
+  }
+
+  if (current.stepsCompliance < current.workoutCompliance) {
+    return 'Priority for next week: hit your daily step target more consistently.';
+  }
+
+  if (current.workoutCompliance >= 80 && current.stepsCompliance >= 80) {
+    return 'Keep following the same routine and maintain this consistency.';
+  }
+
+  return 'Priority for next week: complete your planned workouts and hit your daily step target more consistently.';
+}
+
+private getWeeklyFeedbackTrendMessage(trend: WeeklyConsistencyTrend): string {
+  if (trend === 'improving') {
+    return 'Great improvement compared to last week.';
+  }
+
+  if (trend === 'declining') {
+    return 'Your score dropped compared to last week, so let\u2019s focus on getting back to your usual consistency.';
+  }
+
+  return '';
+}
+
+private combineWeeklyFeedbackNotes(improvementArea: string, trendMessage: string): string {
+  const priority = improvementArea.replace(/\.$/, '');
+  const trend = trendMessage.replace(/\.$/, '');
+  return `${priority}, and ${trend.charAt(0).toLowerCase()}${trend.slice(1)}.`;
 }
 
 getCoachAction(score: number | null | undefined = this.currentWeekConsistency?.score): { label: string; className: string } {
@@ -2129,11 +2198,67 @@ private buildDietWhatsAppMealSection(meal: DietMealViewModel): string {
 }
 
 private formatDietWhatsAppFoodLine(foodName: string, item: any): string {
-  const food = String(foodName || '').trim();
+  const rawFood = String(foodName || '').trim();
+  const quantity = this.formatDietWhatsAppQuantity(item);
+  const food = this.stripDietWhatsAppLeadingQuantity(rawFood, item);
   if (!food) return '';
 
-  const quantity = this.formatDietWhatsAppQuantity(item);
   return `${this.getDietFoodIcon(food)} ${quantity ? `${quantity} ` : ''}${food}`.trim();
+}
+
+private stripDietWhatsAppLeadingQuantity(foodName: string, item: any): string {
+  const quantity = item?.quantity;
+  const unit = String(item?.unit || '').trim();
+
+  if (quantity === '' || quantity == null || !unit || !foodName) {
+    return foodName;
+  }
+
+  const quantityPattern = this.getDietWhatsAppQuantityPattern(quantity);
+  const unitPattern = this.getDietWhatsAppUnitPattern(unit);
+
+  if (!quantityPattern || !unitPattern) {
+    return foodName;
+  }
+
+  const leadingQuantityPattern = new RegExp(`^${quantityPattern}\\s*${unitPattern}(?=\\s|\\b|$)\\s*`, 'i');
+  return foodName.replace(leadingQuantityPattern, '').trim() || foodName;
+}
+
+private getDietWhatsAppQuantityPattern(quantity: any): string {
+  const numericQuantity = Number(quantity);
+
+  if (Number.isFinite(numericQuantity)) {
+    return `${this.escapeRegExp(String(numericQuantity))}(?:\\.0+)?`;
+  }
+
+  return this.escapeRegExp(String(quantity).trim());
+}
+
+private getDietWhatsAppUnitPattern(unit: string): string {
+  const normalizedUnit = unit.trim().toLowerCase();
+
+  if (normalizedUnit === 'g' || normalizedUnit === 'gm') {
+    return '(?:g|gm|gram|grams)';
+  }
+
+  if (normalizedUnit === 'ml') {
+    return '(?:ml|millilitre|millilitres|milliliter|milliliters)';
+  }
+
+  if (normalizedUnit === 'kg') {
+    return '(?:kg|kilogram|kilograms)';
+  }
+
+  if (normalizedUnit === 'l') {
+    return '(?:l|litre|litres|liter|liters)';
+  }
+
+  return this.escapeRegExp(unit);
+}
+
+private escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 private formatDietWhatsAppQuantity(item: any): string {
@@ -2605,6 +2730,7 @@ applyComparisonEnhancementPreset(preset: ComparisonEnhancementPreset) {
     natural: { contrast: 100, brightness: 100, saturate: 100, clarity: 0 },
     sharp: { contrast: 112, brightness: 103, saturate: 106, clarity: 8 },
     defined: { contrast: 122, brightness: 101, saturate: 110, clarity: 14 },
+    stage: { contrast: 130, brightness: 94, saturate: 112, clarity: 18 },
     custom: this.comparisonEnhancement
   };
 
@@ -2616,18 +2742,17 @@ onComparisonEnhancementChanged() {
 }
 
 resetComparisonEnhancement() {
-  this.applyComparisonEnhancementPreset('sharp');
+  this.applyComparisonEnhancementPreset('stage');
 }
 
 get comparisonPhotoFilter(): string {
   const { contrast, brightness, saturate, clarity } = this.comparisonEnhancement;
-  const shadowStrength = this.roundTo(clarity / 100, 2);
+  const definitionContrast = Math.min(150, contrast + Math.round(clarity * 0.35));
 
   return [
-    `contrast(${contrast}%)`,
+    `contrast(${definitionContrast}%)`,
     `brightness(${brightness}%)`,
-    `saturate(${saturate}%)`,
-    clarity > 0 ? `drop-shadow(0 0 ${clarity / 2}px rgba(15, 23, 42, ${shadowStrength}))` : ''
+    `saturate(${saturate}%)`
   ].filter(Boolean).join(' ');
 }
 

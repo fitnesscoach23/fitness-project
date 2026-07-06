@@ -61,6 +61,14 @@ public class DailyMemberCheckIn {
 
     @Column(nullable = false)
     @Builder.Default
+    private Boolean workoutVideoNotShared = Boolean.FALSE;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean stepsRecordNotShared = Boolean.FALSE;
+
+    @Column(nullable = false)
+    @Builder.Default
     private Boolean notActive = Boolean.FALSE;
 
     @Column(columnDefinition = "TEXT")

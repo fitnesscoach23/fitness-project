@@ -19,6 +19,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -111,5 +112,16 @@ class WorkoutServiceTest {
 
         assertEquals(NOT_FOUND, exception.getStatusCode());
         assertEquals("Plan not found", exception.getReason());
+    }
+
+    @Test
+    void deleteDayDoesNothingWhenDayAlreadyDeleted() {
+        UUID dayId = UUID.randomUUID();
+        when(dayRepo.findById(dayId)).thenReturn(Optional.empty());
+
+        service.deleteDay("coach@example.com", dayId);
+
+        verify(exerciseRepo, never()).findByDayId(dayId);
+        verify(dayRepo, never()).delete(org.mockito.ArgumentMatchers.any());
     }
 }

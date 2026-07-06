@@ -12,6 +12,8 @@ export interface DailyCheckinDay {
   travelWorkout?: boolean;
   recoveryDay?: boolean;
   activeOther?: boolean;
+  workoutVideoNotShared?: boolean;
+  stepsRecordNotShared?: boolean;
   notActive?: boolean;
   active: boolean;
   notes?: string | null;
@@ -25,6 +27,8 @@ export type DailyActivityMarker =
   | 'travelWorkout'
   | 'recoveryDay'
   | 'activeOther'
+  | 'workoutVideoNotShared'
+  | 'stepsRecordNotShared'
   | 'notActive';
 
 export interface DailyCheckinSummary {
@@ -51,6 +55,8 @@ export interface DailyCheckinUpsertRequest {
   travelWorkout?: boolean;
   recoveryDay?: boolean;
   activeOther?: boolean;
+  workoutVideoNotShared?: boolean;
+  stepsRecordNotShared?: boolean;
   notActive?: boolean;
   notes?: string | null;
 }

@@ -13,6 +13,8 @@ public record DailyMemberCheckInDayResponse(
         boolean travelWorkout,
         boolean recoveryDay,
         boolean activeOther,
+        boolean workoutVideoNotShared,
+        boolean stepsRecordNotShared,
         boolean notActive,
         boolean active,
         String notes,
