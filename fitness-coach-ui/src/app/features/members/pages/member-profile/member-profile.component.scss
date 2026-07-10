@@ -721,6 +721,18 @@ input:focus {
   margin-bottom: 14px;
 }
 
+.workout-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workout-export-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+
 .assign-row {
   display: flex;
   gap: 12px;
@@ -729,19 +741,6 @@ input:focus {
 
 .plan-title {
   margin-bottom: 20px;
-}
-
-.day-card {
-  background: #f8f9fb;
-  padding: 18px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-}
-
-.day-title {
-  margin-bottom: 15px;
-  font-size: 16px;
-  font-weight: 600;
 }
 
 .exercise-card {
@@ -780,6 +779,7 @@ input:focus {
 
 .day-title {
   margin-bottom: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 

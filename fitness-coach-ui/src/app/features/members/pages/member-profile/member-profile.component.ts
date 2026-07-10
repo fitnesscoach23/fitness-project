@@ -121,6 +121,7 @@ export class MemberProfileComponent implements OnInit {
   allWorkoutPlans: any[] = [];
   assigningWorkout = false;
   assignWorkoutError: string | null = null;
+  exportWorkoutVideoAsUrl = false;
   selectedWorkoutPlanId: string | null = null;
   activeWorkoutPlan: any = null;
   pastWorkoutPlans: any[] = [];
@@ -1033,6 +1034,15 @@ get displayedActiveSince(): string {
   return this.getMemberCreatedDate() || this.getOriginalSubscriptionStartDate() || this.subscription?.startDate || '-';
 }
 
+get memberActiveStartDate(): string {
+  return this.normalizeDateInput(
+    this.getMemberCreatedDate()
+    || this.getOriginalSubscriptionStartDate()
+    || this.subscription?.startDate
+    || ''
+  );
+}
+
 get displayedRenewalDate(): string {
   return this.overrideRenewalDate || this.subscription?.endDate || '-';
 }
@@ -1629,14 +1639,15 @@ private buildWeeklyConsistencyScore(
   end: Date,
   days: DailyCheckinDay[]
 ): WeeklyConsistencyScore {
-  const dateKeys = this.getDateKeysBetween(start, end);
+  const dateKeys = this.getDateKeysBetween(start, end)
+    .filter((date) => this.isOnOrAfterMemberActiveStart(date));
   const entriesByDate = new Map(days.map((day) => [day.checkInDate, day]));
   const weekEntries = dateKeys.map((date) => entriesByDate.get(date) || null);
   const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
   const activeDays = weekEntries.filter((entry) => this.isActiveDailyEntry(entry)).length;
   const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
   const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
-  const plannedWorkouts = this.getPlannedWorkoutsPerWeek();
+  const plannedWorkouts = this.getTrackedPlannedWorkouts(dateKeys.length);
   const stepTarget = Math.max(0, Number(this.activeWorkoutPlan?.targetStepsCount || 0));
   const workoutCompliance = this.calculateWorkoutCompliance(completedWorkouts, plannedWorkouts);
   const stepsCompliance = this.calculateStepsCompliance(averageDailySteps, stepTarget);
@@ -1663,6 +1674,13 @@ private buildWeeklyConsistencyScore(
 
 private getPlannedWorkoutsPerWeek(): number {
   return Array.isArray(this.activeWorkoutPlan?.days) ? this.activeWorkoutPlan.days.length : 0;
+}
+
+private getTrackedPlannedWorkouts(trackedDays: number): number {
+  const plannedWorkouts = this.getPlannedWorkoutsPerWeek();
+  if (!trackedDays || !plannedWorkouts) return 0;
+  if (trackedDays >= 7) return plannedWorkouts;
+  return Math.max(1, Math.ceil((plannedWorkouts * trackedDays) / 7));
 }
 
 calculateWorkoutCompliance(completedWorkouts: number, plannedWorkouts: number): number {
@@ -1921,6 +1939,7 @@ private syncGeneratedCoachFeedback(): void {
 
 private updateActivityFollowUp(days: DailyCheckinDay[], today: Date): void {
   const activeEntries = (days || [])
+    .filter((entry) => this.isOnOrAfterMemberActiveStart(entry.checkInDate))
     .filter((entry) => this.isActiveDailyEntry(entry))
     .sort((a, b) => b.checkInDate.localeCompare(a.checkInDate));
   const latest = activeEntries[0] || null;
@@ -1940,7 +1959,12 @@ private isActiveDailyEntry(entry: DailyCheckinDay | null): boolean {
     || entry.travelWorkout
     || entry.recoveryDay
     || entry.activeOther
+    || Number(entry.stepsCount || 0) > 0
   );
+}
+
+private isOnOrAfterMemberActiveStart(date: string): boolean {
+  return !this.memberActiveStartDate || date >= this.memberActiveStartDate;
 }
 
 private parseDateKey(value: string): Date {
@@ -2417,10 +2441,12 @@ private buildWorkoutPlanExport(): { workbook: any; fileName: string } | null {
         exercise.name || '',
         derivedSetCount || '',
         uniqueReps.length === 1 ? uniqueReps[0] : uniqueReps.join(', '),
-        exercise.videoUrl ? 'Open Video' : ''
+        exercise.videoUrl
+          ? (this.exportWorkoutVideoAsUrl ? exercise.videoUrl : 'Open Video')
+          : ''
       ]);
 
-      if (exercise.videoUrl) {
+      if (exercise.videoUrl && !this.exportWorkoutVideoAsUrl) {
         videoCells.push({
           rowIndex: rows.length - 1,
           colIndex: 4,

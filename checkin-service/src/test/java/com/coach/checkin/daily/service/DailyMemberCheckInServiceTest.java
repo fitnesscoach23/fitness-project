@@ -62,7 +62,7 @@ class DailyMemberCheckInServiceTest {
 
         DailyMemberCheckInDayResponse response = service.upsert(
                 "coach@test.com",
-                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, true, 9000, true, false, false, false, false, false, false, "Strong day")
+                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, true, false, 9000, true, false, false, false, false, false, false, "Strong day")
         );
 
         ArgumentCaptor<DailyMemberCheckIn> captor = ArgumentCaptor.forClass(DailyMemberCheckIn.class);
@@ -77,6 +77,7 @@ class DailyMemberCheckInServiceTest {
         assertEquals("Strong day", saved.getNotes());
         assertTrue(response.active());
         assertTrue(response.exerciseDone());
+        assertFalse(response.workoutNotCompleted());
         assertTrue(response.stepTargetAchieved());
         assertFalse(response.workoutVideoNotShared());
         assertFalse(response.stepsRecordNotShared());
@@ -105,17 +106,35 @@ class DailyMemberCheckInServiceTest {
 
         DailyMemberCheckInDayResponse response = service.upsert(
                 "coach@test.com",
-                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, false, 0, false, false, true, false, true, true, false, "Rest day")
+                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, false, true, 0, false, false, true, false, true, true, false, "Rest day")
         );
 
         assertEquals(existingId, response.id());
         assertFalse(response.exerciseDone());
+        assertTrue(response.workoutNotCompleted());
         assertTrue(response.active());
         assertTrue(response.recoveryDay());
         assertTrue(response.workoutVideoNotShared());
         assertTrue(response.stepsRecordNotShared());
         assertEquals(0, response.stepsCount());
         assertEquals("Rest day", response.notes());
+    }
+
+    @Test
+    void upsertShouldMarkDayActiveWhenOnlyStepsAreRecorded() {
+        UUID memberId = UUID.randomUUID();
+        LocalDate checkInDate = LocalDate.of(2026, 4, 12);
+        when(repository.findByMemberIdAndCoachEmailAndCheckInDate(memberId, "coach@test.com", checkInDate))
+                .thenReturn(Optional.empty());
+
+        DailyMemberCheckInDayResponse response = service.upsert(
+                "coach@test.com",
+                new UpsertDailyMemberCheckInRequest(memberId, checkInDate, false, false, 4500, false, false, false, false, false, false, true, "Steps shared")
+        );
+
+        assertTrue(response.active());
+        assertFalse(response.notActive());
+        assertEquals(4500, response.stepsCount());
     }
 
     @Test

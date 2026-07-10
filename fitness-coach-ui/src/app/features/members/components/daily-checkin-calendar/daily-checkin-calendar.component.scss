@@ -68,7 +68,7 @@
 
 .calendar-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 380px);
   gap: 20px;
   align-items: start;
 }
@@ -187,6 +187,11 @@
   background: #ffffff;
 }
 
+.legend-dot.not-tracked {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
 .legend-dot.workout-completed,
 .legend-dot.step-target-achieved,
 .legend-dot.travel-workout,
@@ -194,6 +199,11 @@
 .legend-dot.active-other {
   background: #dcfce7;
   border-color: #16a34a;
+}
+
+.legend-dot.workout-not-completed {
+  background: #fee2e2;
+  border-color: #dc2626;
 }
 
 .legend-dot.workout-video-not-shared,
@@ -260,6 +270,12 @@
   background: #ffffff;
 }
 
+.day-cell.not-tracked {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: default;
+}
+
 .day-cell.no-activity {
   background: #fffbeb;
 }
@@ -297,6 +313,11 @@
   color: #92400e;
 }
 
+.day-state.workout-not-completed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .day-exercise {
   background: #dcfce7;
   color: #166534;
@@ -312,6 +333,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
+  align-items: flex-start;
 }
 
 .editor-header h4 {
@@ -325,12 +347,45 @@
   font-size: 13px;
 }
 
-.exercise-toggle {
-  display: inline-flex;
-  align-items: center;
+.marker-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 16px;
-  font-size: 14px;
+}
+
+.exercise-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 48px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.exercise-toggle:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.exercise-toggle input {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 1px 0 0;
+  accent-color: #2563eb;
+}
+
+.exercise-toggle span {
+  min-width: 0;
 }
 
 .editor-field {
@@ -421,6 +476,10 @@
     grid-template-columns: 1fr;
   }
 
+  .marker-editor {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .bulk-update-header,
   .bulk-actions {
     align-items: stretch;
@@ -434,5 +493,11 @@
   .day-cell {
     min-height: 96px;
     padding: 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .marker-editor {
+    grid-template-columns: 1fr;
   }
 }

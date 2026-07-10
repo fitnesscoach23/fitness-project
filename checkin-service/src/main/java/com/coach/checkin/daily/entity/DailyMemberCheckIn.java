@@ -41,6 +41,10 @@ public class DailyMemberCheckIn {
     @Builder.Default
     private Boolean exerciseDone = Boolean.FALSE;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean workoutNotCompleted = Boolean.FALSE;
+
     private Integer stepsCount;
 
     @Column(nullable = false)

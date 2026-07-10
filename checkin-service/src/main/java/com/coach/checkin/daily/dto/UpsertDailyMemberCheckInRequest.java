@@ -10,6 +10,7 @@ public record UpsertDailyMemberCheckInRequest(
         @NotNull UUID memberId,
         @NotNull LocalDate checkInDate,
         Boolean exerciseDone,
+        Boolean workoutNotCompleted,
         @PositiveOrZero Integer stepsCount,
         Boolean stepTargetAchieved,
         Boolean travelWorkout,

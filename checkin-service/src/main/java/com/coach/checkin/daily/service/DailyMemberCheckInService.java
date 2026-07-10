@@ -34,8 +34,11 @@ public class DailyMemberCheckInService {
                         .checkInDate(request.checkInDate())
                         .build());
 
-        boolean notActive = Boolean.TRUE.equals(request.notActive());
-        checkIn.setExerciseDone(!notActive && Boolean.TRUE.equals(request.exerciseDone()));
+        boolean hasPositiveSteps = request.stepsCount() != null && request.stepsCount() > 0;
+        boolean notActive = Boolean.TRUE.equals(request.notActive()) && !hasPositiveSteps;
+        boolean exerciseDone = !notActive && Boolean.TRUE.equals(request.exerciseDone());
+        checkIn.setExerciseDone(exerciseDone);
+        checkIn.setWorkoutNotCompleted(!exerciseDone && Boolean.TRUE.equals(request.workoutNotCompleted()));
         checkIn.setStepsCount(notActive ? 0 : request.stepsCount());
         checkIn.setStepTargetAchieved(!notActive && Boolean.TRUE.equals(request.stepTargetAchieved()));
         checkIn.setTravelWorkout(!notActive && Boolean.TRUE.equals(request.travelWorkout()));
@@ -107,22 +110,26 @@ public class DailyMemberCheckInService {
 
     private DailyMemberCheckInDayResponse toDayResponse(DailyMemberCheckIn checkIn) {
         boolean stepTargetAchieved = Boolean.TRUE.equals(checkIn.getStepTargetAchieved());
+        boolean workoutNotCompleted = Boolean.TRUE.equals(checkIn.getWorkoutNotCompleted());
         boolean travelWorkout = Boolean.TRUE.equals(checkIn.getTravelWorkout());
         boolean recoveryDay = Boolean.TRUE.equals(checkIn.getRecoveryDay());
         boolean activeOther = Boolean.TRUE.equals(checkIn.getActiveOther());
         boolean workoutVideoNotShared = Boolean.TRUE.equals(checkIn.getWorkoutVideoNotShared());
         boolean stepsRecordNotShared = Boolean.TRUE.equals(checkIn.getStepsRecordNotShared());
         boolean notActive = Boolean.TRUE.equals(checkIn.getNotActive());
+        boolean hasPositiveSteps = checkIn.getStepsCount() != null && checkIn.getStepsCount() > 0;
         boolean active = Boolean.TRUE.equals(checkIn.getExerciseDone())
                 || stepTargetAchieved
                 || travelWorkout
                 || recoveryDay
-                || activeOther;
+                || activeOther
+                || hasPositiveSteps;
 
         return new DailyMemberCheckInDayResponse(
                 checkIn.getId(),
                 checkIn.getCheckInDate(),
                 Boolean.TRUE.equals(checkIn.getExerciseDone()),
+                workoutNotCompleted,
                 checkIn.getStepsCount(),
                 stepTargetAchieved,
                 travelWorkout,

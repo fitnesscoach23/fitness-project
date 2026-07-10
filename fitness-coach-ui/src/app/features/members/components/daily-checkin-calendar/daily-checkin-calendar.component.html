@@ -135,6 +135,7 @@
 
       <div class="calendar-legend">
         <span><i class="legend-dot no-entry"></i>No entry</span>
+        <span *ngIf="activeStartDate"><i class="legend-dot not-tracked"></i>Before active date</span>
         <span *ngFor="let marker of activityMarkers">
           <i class="legend-dot" [ngClass]="marker.className"></i>{{ marker.label }}
         </span>
@@ -150,7 +151,7 @@
           *ngFor="let cell of cells"
           class="day-cell"
           [ngClass]="getCellClass(cell)"
-          [disabled]="!cell.inMonth"
+          [disabled]="isCellDisabled(cell)"
           (click)="selectDay(cell)">
           <span class="day-number">{{ cell.dayNumber || '' }}</span>
           <span
@@ -183,7 +184,7 @@
             type="checkbox"
             [(ngModel)]="editor[marker.key]"
             (ngModelChange)="onEditorMarkerChanged(marker.key)" />
-          {{ marker.label }}
+          <span>{{ marker.label }}</span>
         </label>
       </div>
 
@@ -193,6 +194,7 @@
           type="number"
           min="0"
           [(ngModel)]="editor.stepsCount"
+          (ngModelChange)="onEditorStepsChanged()"
           placeholder="0" />
       </div>
 

@@ -8,6 +8,7 @@ public record DailyMemberCheckInDayResponse(
         UUID id,
         LocalDate checkInDate,
         boolean exerciseDone,
+        boolean workoutNotCompleted,
         Integer stepsCount,
         boolean stepTargetAchieved,
         boolean travelWorkout,

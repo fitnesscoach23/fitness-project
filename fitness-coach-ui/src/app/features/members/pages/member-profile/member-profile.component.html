@@ -1155,6 +1155,7 @@
     <div class="card daily-consistency-card">
       <app-daily-checkin-calendar
         [memberId]="member.id"
+        [activeStartDate]="memberActiveStartDate"
         (checkinsChanged)="loadWeeklyConsistency()">
       </app-daily-checkin-calendar>
     </div>
@@ -1165,18 +1166,27 @@
 
   <div class="workout-toolbar">
     <h3 class="card-title">Workout Plan</h3>
-    <button
-      class="secondary-btn"
-      (click)="exportWorkoutPlanToExcel()"
-      [disabled]="!activeWorkoutPlan">
-      Export to Excel
-    </button>
-    <button
-      class="secondary-btn"
-      (click)="sendWorkoutPlanWhatsApp()"
-      [disabled]="!activeWorkoutPlan || sendingWorkoutPlanWhatsApp">
-      {{ sendingWorkoutPlanWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
-    </button>
+    <div class="workout-actions">
+      <label class="workout-export-toggle">
+        <input
+          type="checkbox"
+          [(ngModel)]="exportWorkoutVideoAsUrl"
+          [disabled]="!activeWorkoutPlan" />
+        <span>Export full video URL</span>
+      </label>
+      <button
+        class="secondary-btn"
+        (click)="exportWorkoutPlanToExcel()"
+        [disabled]="!activeWorkoutPlan">
+        Export to Excel
+      </button>
+      <button
+        class="secondary-btn"
+        (click)="sendWorkoutPlanWhatsApp()"
+        [disabled]="!activeWorkoutPlan || sendingWorkoutPlanWhatsApp">
+        {{ sendingWorkoutPlanWhatsApp ? 'Sending...' : 'Send WhatsApp' }}
+      </button>
+    </div>
   </div>
 
   <p *ngIf="workoutPlanWhatsAppMessage" class="inline-status">

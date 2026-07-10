@@ -20,6 +20,7 @@ interface CalendarCell {
 interface DailyCheckinEditor {
   checkInDate: string;
   exerciseDone: boolean;
+  workoutNotCompleted: boolean;
   stepTargetAchieved: boolean;
   travelWorkout: boolean;
   recoveryDay: boolean;
@@ -51,11 +52,13 @@ interface BulkDailyCheckinEditor {
 })
 export class DailyCheckinCalendarComponent implements OnChanges {
   @Input({ required: true }) memberId = '';
+  @Input() activeStartDate = '';
   @Output() checkinsChanged = new EventEmitter<void>();
 
   readonly weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   readonly activityMarkers: { key: DailyActivityMarker; label: string; className: string }[] = [
     { key: 'exerciseDone', label: 'Workout Completed', className: 'workout-completed' },
+    { key: 'workoutNotCompleted', label: 'Workout Not Completed', className: 'workout-not-completed' },
     { key: 'stepTargetAchieved', label: 'Step Target Achieved', className: 'step-target-achieved' },
     { key: 'travelWorkout', label: 'Travel Workout', className: 'travel-workout' },
     { key: 'recoveryDay', label: 'Recovery Day', className: 'recovery-day' },
@@ -90,11 +93,29 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['memberId'] && this.memberId) {
       this.loadCalendar();
+      return;
+    }
+
+    if (changes['activeStartDate']) {
+      this.bulkEditor = this.createDefaultBulkEditor();
+      this.closeEditor();
+      if (this.calendar) {
+        this.cells = this.buildCells(this.calendar.days || []);
+      }
     }
   }
 
   get summary(): DailyCheckinSummary {
-    return this.calendar?.summary || this.emptySummary;
+    if (!this.cells.length) return this.emptySummary;
+
+    const trackedCells = this.cells.filter((cell) => cell.inMonth && this.isTrackableDate(cell.date));
+    return {
+      daysInMonth: trackedCells.length,
+      recordedDays: trackedCells.filter((cell) => Boolean(cell.entry)).length,
+      activeDays: trackedCells.filter((cell) => this.isEntryActive(cell.entry)).length,
+      exerciseDays: trackedCells.filter((cell) => Boolean(cell.entry?.exerciseDone)).length,
+      totalSteps: trackedCells.reduce((sum, cell) => sum + Math.max(0, Number(cell.entry?.stepsCount || 0)), 0)
+    };
   }
 
   get visibleMonthLabel(): string {
@@ -118,12 +139,13 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   }
 
   selectDay(cell: CalendarCell): void {
-    if (!cell.inMonth || !cell.date) return;
+    if (!cell.inMonth || !cell.date || !this.isTrackableDate(cell.date)) return;
 
     this.selectedEntry = cell.entry;
     this.editor = {
       checkInDate: cell.date,
       exerciseDone: Boolean(cell.entry?.exerciseDone),
+      workoutNotCompleted: Boolean(cell.entry?.workoutNotCompleted),
       stepTargetAchieved: Boolean(cell.entry?.stepTargetAchieved),
       travelWorkout: Boolean(cell.entry?.travelWorkout),
       recoveryDay: Boolean(cell.entry?.recoveryDay),
@@ -164,20 +186,22 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   saveSelectedDay(): void {
     if (!this.editor || !this.memberId) return;
 
+    const stepsCount = Math.max(0, Number(this.editor.stepsCount || 0));
     this.saving = true;
     this.error = null;
     this.dailyCheckinApi.upsertDailyCheckin({
       memberId: this.memberId,
       checkInDate: this.editor.checkInDate,
       exerciseDone: this.editor.exerciseDone,
+      workoutNotCompleted: this.editor.workoutNotCompleted,
       stepTargetAchieved: this.editor.stepTargetAchieved,
       travelWorkout: this.editor.travelWorkout,
       recoveryDay: this.editor.recoveryDay,
       activeOther: this.editor.activeOther,
       workoutVideoNotShared: this.editor.workoutVideoNotShared,
       stepsRecordNotShared: this.editor.stepsRecordNotShared,
-      notActive: this.editor.notActive,
-      stepsCount: Math.max(0, Number(this.editor.stepsCount || 0)),
+      notActive: this.editor.notActive && stepsCount === 0,
+      stepsCount,
       notes: this.editor.notes.trim() || null
     }).subscribe({
       next: () => {
@@ -222,12 +246,16 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     forkJoin(dateKeys.map((checkInDate) => {
       const existing = entriesByDate.get(checkInDate);
       const addingActiveMarker = this.isActiveMarker(this.bulkEditor.marker) && this.bulkEditor.value;
-      const bulkNotActive = addingActiveMarker
+      const bulkHasPositiveSteps = bulkSteps != null && bulkSteps > 0;
+      const bulkNotActive = addingActiveMarker || bulkHasPositiveSteps
         ? false
         : this.getBulkMarkerValue(existing, 'notActive');
       const exerciseDone = bulkNotActive || this.bulkEditor.noWorkout
         ? false
         : this.getBulkMarkerValue(existing, 'exerciseDone');
+      const workoutNotCompleted = exerciseDone
+        ? false
+        : (this.bulkEditor.noWorkout || this.getBulkMarkerValue(existing, 'workoutNotCompleted'));
       const stepTargetAchieved = bulkNotActive || this.bulkEditor.noSteps
         ? false
         : this.getBulkMarkerValue(existing, 'stepTargetAchieved');
@@ -236,18 +264,20 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       const activeOther = bulkNotActive ? false : this.getBulkMarkerValue(existing, 'activeOther');
       const workoutVideoNotShared = this.getBulkMarkerValue(existing, 'workoutVideoNotShared');
       const stepsRecordNotShared = this.getBulkMarkerValue(existing, 'stepsRecordNotShared');
-      const finalNotActive = bulkNotActive && !exerciseDone && !stepTargetAchieved
+      const provisionalStepsCount = this.bulkEditor.noSteps || bulkNotActive
+        ? 0
+        : (bulkSteps ?? Math.max(0, Number(existing?.stepsCount || 0)));
+      const finalNotActive = bulkNotActive && provisionalStepsCount === 0 && !exerciseDone && !stepTargetAchieved
         && !travelWorkout
         && !recoveryDay
         && !activeOther;
-      const stepsCount = this.bulkEditor.noSteps || finalNotActive
-        ? 0
-        : (bulkSteps ?? Math.max(0, Number(existing?.stepsCount || 0)));
+      const stepsCount = finalNotActive ? 0 : provisionalStepsCount;
 
       return this.dailyCheckinApi.upsertDailyCheckin({
         memberId: this.memberId,
         checkInDate,
         exerciseDone,
+        workoutNotCompleted,
         stepTargetAchieved,
         travelWorkout,
         recoveryDay,
@@ -297,8 +327,17 @@ export class DailyCheckinCalendarComponent implements OnChanges {
 
   getCellClass(cell: CalendarCell): string {
     if (!cell.inMonth) return 'empty';
+    if (!this.isTrackableDate(cell.date)) return 'not-tracked';
     if (!cell.entry) return 'no-entry';
     return this.isEntryActive(cell.entry) ? 'active-day' : 'no-activity';
+  }
+
+  isCellDisabled(cell: CalendarCell): boolean {
+    return !cell.inMonth || !this.isTrackableDate(cell.date);
+  }
+
+  isTrackableDate(date: string): boolean {
+    return !this.activeStartDate || date >= this.activeStartDate;
   }
 
   getMarkerLabel(marker: DailyActivityMarker): string {
@@ -314,7 +353,14 @@ export class DailyCheckinCalendarComponent implements OnChanges {
 
   isEntryActive(entry: DailyCheckinDay | null): boolean {
     if (!entry) return false;
-    return Boolean(entry.exerciseDone || entry.stepTargetAchieved || entry.travelWorkout || entry.recoveryDay || entry.activeOther);
+    return Boolean(
+      entry.exerciseDone
+      || entry.stepTargetAchieved
+      || entry.travelWorkout
+      || entry.recoveryDay
+      || entry.activeOther
+      || Number(entry.stepsCount || 0) > 0
+    );
   }
 
   getMarkerChecked(marker: DailyActivityMarker): boolean {
@@ -326,6 +372,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
 
     if (marker === 'notActive' && this.editor.notActive) {
       this.editor.exerciseDone = false;
+      this.editor.workoutNotCompleted = false;
       this.editor.stepTargetAchieved = false;
       this.editor.travelWorkout = false;
       this.editor.recoveryDay = false;
@@ -334,7 +381,23 @@ export class DailyCheckinCalendarComponent implements OnChanges {
       return;
     }
 
+    if (marker === 'exerciseDone' && this.editor.exerciseDone) {
+      this.editor.workoutNotCompleted = false;
+    }
+
+    if (marker === 'workoutNotCompleted' && this.editor.workoutNotCompleted) {
+      this.editor.exerciseDone = false;
+    }
+
     if (this.isActiveMarker(marker) && this.editor[marker]) {
+      this.editor.notActive = false;
+    }
+  }
+
+  onEditorStepsChanged(): void {
+    if (!this.editor) return;
+
+    if (Number(this.editor.stepsCount || 0) > 0) {
       this.editor.notActive = false;
     }
   }
@@ -410,9 +473,12 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     const [year, month] = this.visibleMonth.split('-').map(Number);
     const firstDate = `${this.visibleMonth}-01`;
     const lastDate = `${this.visibleMonth}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+    const startDate = this.activeStartDate && this.activeStartDate > firstDate && this.activeStartDate <= lastDate
+      ? this.activeStartDate
+      : firstDate;
 
     return {
-      startDate: firstDate,
+      startDate,
       endDate: lastDate,
       marker: 'activeOther',
       value: true,
@@ -433,7 +499,10 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     if (!cursor || !last) return [];
 
     while (cursor <= last) {
-      keys.push(this.getDateKey(cursor));
+      const dateKey = this.getDateKey(cursor);
+      if (this.isTrackableDate(dateKey)) {
+        keys.push(dateKey);
+      }
       cursor.setDate(cursor.getDate() + 1);
     }
 
@@ -461,6 +530,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
 
   private isActiveMarker(marker: DailyActivityMarker): boolean {
     return marker !== 'notActive'
+      && marker !== 'workoutNotCompleted'
       && marker !== 'workoutVideoNotShared'
       && marker !== 'stepsRecordNotShared';
   }

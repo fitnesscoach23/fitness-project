@@ -7,6 +7,7 @@ export interface DailyCheckinDay {
   id: string;
   checkInDate: string;
   exerciseDone: boolean;
+  workoutNotCompleted?: boolean;
   stepsCount: number;
   stepTargetAchieved?: boolean;
   travelWorkout?: boolean;
@@ -23,6 +24,7 @@ export interface DailyCheckinDay {
 
 export type DailyActivityMarker =
   | 'exerciseDone'
+  | 'workoutNotCompleted'
   | 'stepTargetAchieved'
   | 'travelWorkout'
   | 'recoveryDay'
@@ -50,6 +52,7 @@ export interface DailyCheckinUpsertRequest {
   memberId: string;
   checkInDate: string;
   exerciseDone: boolean;
+  workoutNotCompleted?: boolean;
   stepsCount: number;
   stepTargetAchieved?: boolean;
   travelWorkout?: boolean;
