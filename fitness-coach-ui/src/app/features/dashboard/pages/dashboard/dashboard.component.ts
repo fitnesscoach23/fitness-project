@@ -30,6 +30,7 @@ type CheckinReminderRow = {
   fullName: string;
   email: string;
   phone: string;
+  lastTwoWeekDailyConsistencyScore: number;
   cadenceDays: number;
   lastCheckinDate: string;
   nextCheckinDate: string;
@@ -64,6 +65,8 @@ type FollowUpRequiredRow = {
   phone: string;
   weeklyScore: number;
   previousWeeklyScore: number | null;
+  lastTwoWeekDailyConsistencyScore: number;
+  eligibleForCheckin: boolean;
   trend: 'up' | 'down' | 'stable';
   daysSinceActivity: number | null;
   lastActivityDate: string;
@@ -291,6 +294,17 @@ export class DashboardComponent implements OnInit {
     return this.checkinReminderRows.filter((member) =>
       member.cadenceConfigured && member.daysUntilDue <= 0
     ).length;
+  }
+
+  get averageCheckinConsistencyScore(): number {
+    if (!this.checkinReminderRows.length) return 0;
+
+    const total = this.checkinReminderRows.reduce(
+      (sum, member) => sum + member.lastTwoWeekDailyConsistencyScore,
+      0
+    );
+
+    return Math.round(total / this.checkinReminderRows.length);
   }
 
   get billingAttentionCount(): number {
@@ -785,6 +799,7 @@ export class DashboardComponent implements OnInit {
     const currentWeekEnd = this.addDateDays(currentWeekStart, 6);
     const previousWeekStart = this.addDateDays(currentWeekStart, -7);
     const previousWeekEnd = this.addDateDays(currentWeekStart, -1);
+    const checkinCenterWindowStart = this.addDateDays(today, -13);
     const activityLookbackStart = this.addDateDays(today, -60);
     const dailyMonthKeys = Array.from(new Set([
       ...this.getMonthKeysBetweenDates(currentWeekStart, currentWeekEnd),
@@ -820,7 +835,14 @@ export class DashboardComponent implements OnInit {
           const weeklyCheckins = (progressCheckins || []).filter((checkin: any) =>
             this.isCurrentWeek(checkin.submittedAt || checkin.checkInDate || checkin.createdAt)
           );
+          const activeWorkoutPlan = this.getActiveWorkoutPlan(workoutPlans);
           const dailyDays = (dailyCalendars || []).flatMap((calendar: any) => calendar?.days || []);
+          const lastTwoWeekDailyConsistencyScore = this.calculateDailyConsistencyScore(
+            dailyDays,
+            checkinCenterWindowStart,
+            today,
+            activeWorkoutPlan
+          );
           const followUpRow = this.buildFollowUpRequiredRow(
             member,
             workoutPlans,
@@ -830,7 +852,8 @@ export class DashboardComponent implements OnInit {
             currentWeekEnd,
             previousWeekStart,
             previousWeekEnd,
-            today
+            today,
+            lastTwoWeekDailyConsistencyScore
           );
 
           return {
@@ -848,7 +871,12 @@ export class DashboardComponent implements OnInit {
                 checkinDate: checkin.submittedAt || checkin.checkInDate || checkin.createdAt || '',
                 status: this.getCheckinReviewStatusLabel(checkin)
               } as PendingReviewRow)),
-            checkinReminder: this.buildCheckinReminderRow(member, progressCheckins || [], subscription),
+            checkinReminder: this.buildCheckinReminderRow(
+              member,
+              progressCheckins || [],
+              subscription,
+              lastTwoWeekDailyConsistencyScore
+            ),
             followUpRow
           };
         })
@@ -871,12 +899,23 @@ export class DashboardComponent implements OnInit {
         this.checkinReminderRows = rows
           .map((row) => row.checkinReminder)
           .filter((row): row is CheckinReminderRow => !!row)
+          .filter((row) => row.lastTwoWeekDailyConsistencyScore > 50)
           .sort((a, b) => {
             if (a.cadenceConfigured !== b.cadenceConfigured) {
               return a.cadenceConfigured ? -1 : 1;
             }
             return a.daysUntilDue - b.daysUntilDue;
           });
+        if (
+          this.checkinCadenceMemberId &&
+          !this.checkinReminderRows.some((member) => member.id === this.checkinCadenceMemberId)
+        ) {
+          this.checkinCadenceMemberId = '';
+        }
+        if (!this.checkinCadenceMemberId && this.checkinReminderRows.length) {
+          this.checkinCadenceMemberId = this.checkinReminderRows[0].id;
+          this.checkinCadenceDays = this.getStoredCheckinCadenceDays(this.checkinReminderRows[0].id) || 7;
+        }
         const allFollowUpRows = rows
           .map((row) => row.followUpRow)
           .filter((row): row is FollowUpRequiredRow => !!row);
@@ -994,7 +1033,12 @@ export class DashboardComponent implements OnInit {
     return checkin?.reviewedAt ? 'Reviewed' : 'Pending';
   }
 
-  private buildCheckinReminderRow(member: any, checkins: any[], subscription: any | null = null): CheckinReminderRow | null {
+  private buildCheckinReminderRow(
+    member: any,
+    checkins: any[],
+    subscription: any | null = null,
+    lastTwoWeekDailyConsistencyScore = 0
+  ): CheckinReminderRow | null {
     const cadenceDays = this.getStoredCheckinCadenceDays(member.id);
     const latestProgressCheckinDate = this.getLatestProgressCheckinDate(checkins);
     const activeSinceDate = this.getCheckinActiveSinceDate(member, subscription);
@@ -1029,6 +1073,7 @@ export class DashboardComponent implements OnInit {
       fullName: member.fullName,
       email: member.email,
       phone: member.phone || '',
+      lastTwoWeekDailyConsistencyScore,
       cadenceDays,
       lastCheckinDate,
       nextCheckinDate,
@@ -1061,7 +1106,8 @@ export class DashboardComponent implements OnInit {
     currentWeekEnd: Date,
     previousWeekStart: Date,
     previousWeekEnd: Date,
-    today: Date
+    today: Date,
+    lastTwoWeekDailyConsistencyScore = 0
   ): FollowUpRequiredRow {
     const activeWorkoutPlan = this.getActiveWorkoutPlan(workoutPlans);
     const currentScore = this.calculateWeeklyConsistencyScore(
@@ -1090,6 +1136,8 @@ export class DashboardComponent implements OnInit {
       phone: member.phone || '',
       weeklyScore: currentScore,
       previousWeeklyScore: previousScore,
+      lastTwoWeekDailyConsistencyScore,
+      eligibleForCheckin: lastTwoWeekDailyConsistencyScore > 50,
       trend: this.getScoreTrend(currentScore, previousScore),
       daysSinceActivity,
       lastActivityDate: lastActivityDate || '',
@@ -1113,7 +1161,7 @@ export class DashboardComponent implements OnInit {
     const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
     const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
     const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
-    const plannedWorkouts = Array.isArray(activeWorkoutPlan?.days) ? activeWorkoutPlan.days.length : 0;
+    const plannedWorkouts = this.getTrackedPlannedWorkoutCount(dateKeys.length, activeWorkoutPlan);
     const stepTarget = Math.max(0, Number(activeWorkoutPlan?.targetStepsCount || 0));
     const workoutCompliance = plannedWorkouts > 0
       ? Math.min(100, (Math.max(0, completedWorkouts) / plannedWorkouts) * 100)
@@ -1123,6 +1171,22 @@ export class DashboardComponent implements OnInit {
       : 0;
 
     return Math.round((workoutCompliance * 0.7) + (stepsCompliance * 0.3));
+  }
+
+  private calculateDailyConsistencyScore(
+    days: DailyCheckinDay[],
+    start: Date,
+    end: Date,
+    activeWorkoutPlan: any
+  ): number {
+    return this.calculateWeeklyConsistencyScore(days, start, end, activeWorkoutPlan);
+  }
+
+  private getTrackedPlannedWorkoutCount(trackedDays: number, activeWorkoutPlan: any): number {
+    const plannedWorkoutsPerWeek = Array.isArray(activeWorkoutPlan?.days) ? activeWorkoutPlan.days.length : 0;
+    if (!trackedDays || !plannedWorkoutsPerWeek) return 0;
+
+    return Math.max(1, Math.ceil((plannedWorkoutsPerWeek * trackedDays) / 7));
   }
 
   private getActiveWorkoutPlan(value: any): any {

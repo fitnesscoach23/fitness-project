@@ -82,6 +82,9 @@
             <tr *ngFor="let row of sortedFollowUpRows">
               <td>
                 <strong>{{ row.fullName }}</strong>
+                <small *ngIf="row.eligibleForCheckin" class="checkin-eligible-note">
+                  Eligible for check-in - {{ row.lastTwoWeekDailyConsistencyScore }}/100
+                </small>
                 <small *ngIf="row.sendStatus">{{ row.sendStatus }}</small>
               </td>
               <td>{{ row.weeklyScore }}/100</td>
