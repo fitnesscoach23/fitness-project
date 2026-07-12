@@ -64,7 +64,8 @@ export class WeeklyConsistencyLeaderboardComponent implements OnInit {
     const today = this.startOfDay(new Date());
     const weekStart = this.addDays(this.getSundayWeekStart(today), -7);
     const weekEnd = this.addDays(weekStart, 6);
-    const monthKeys = this.getMonthKeysBetween(weekStart, weekEnd);
+    const workoutMakeupEnd = this.addDays(weekEnd, 1);
+    const monthKeys = this.getMonthKeysBetween(weekStart, workoutMakeupEnd);
 
     this.weekRangeLabel = `${this.formatShortDate(weekStart)} - ${this.formatShortDate(weekEnd)}`;
     this.loading = true;
@@ -192,10 +193,10 @@ export class WeeklyConsistencyLeaderboardComponent implements OnInit {
     const entriesByDate = new Map(days.map((day) => [day.checkInDate, day]));
     const weekEntries = dateKeys.map((date) => entriesByDate.get(date) || null);
 
-    const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
     const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
     const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
     const plannedWorkouts = Array.isArray(activeWorkoutPlan?.days) ? activeWorkoutPlan.days.length : 0;
+    const completedWorkouts = this.countCompletedWorkoutsWithMakeup(entriesByDate, weekStart, weekEnd, plannedWorkouts);
     const stepTarget = Math.max(0, Number(activeWorkoutPlan?.targetStepsCount || 0));
     const workoutCompliance = this.calculateWorkoutCompliance(completedWorkouts, plannedWorkouts);
     const stepsCompliance = this.calculateStepsCompliance(averageDailySteps, stepTarget);
@@ -229,6 +230,17 @@ export class WeeklyConsistencyLeaderboardComponent implements OnInit {
         ...score,
         place: (index + 1) as LeaderboardPlace
       }));
+  }
+
+  private countCompletedWorkoutsWithMakeup(
+    entriesByDate: Map<string, DailyCheckinDay>,
+    start: Date,
+    end: Date,
+    plannedWorkouts: number
+  ): number {
+    const workoutDates = this.getDateKeysBetween(start, this.addDays(end, 1));
+    const completed = workoutDates.filter((date) => Boolean(entriesByDate.get(date)?.exerciseDone)).length;
+    return plannedWorkouts > 0 ? Math.min(completed, plannedWorkouts) : completed;
   }
 
   private resolveActiveWorkoutPlan(workout: any): any {

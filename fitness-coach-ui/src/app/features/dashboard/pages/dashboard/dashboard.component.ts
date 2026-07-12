@@ -801,9 +801,11 @@ export class DashboardComponent implements OnInit {
     const previousWeekEnd = this.addDateDays(currentWeekStart, -1);
     const checkinCenterWindowStart = this.addDateDays(today, -13);
     const activityLookbackStart = this.addDateDays(today, -60);
+    const currentWorkoutMakeupEnd = this.addDateDays(currentWeekEnd, 1);
+    const previousWorkoutMakeupEnd = this.addDateDays(previousWeekEnd, 1);
     const dailyMonthKeys = Array.from(new Set([
-      ...this.getMonthKeysBetweenDates(currentWeekStart, currentWeekEnd),
-      ...this.getMonthKeysBetweenDates(previousWeekStart, previousWeekEnd),
+      ...this.getMonthKeysBetweenDates(currentWeekStart, currentWorkoutMakeupEnd),
+      ...this.getMonthKeysBetweenDates(previousWeekStart, previousWorkoutMakeupEnd),
       ...this.getMonthKeysBetweenDates(activityLookbackStart, today)
     ]));
 
@@ -1158,10 +1160,10 @@ export class DashboardComponent implements OnInit {
     const dateKeys = this.getDateKeysBetweenDates(start, end);
     const entriesByDate = new Map((days || []).map((day) => [day.checkInDate, day]));
     const weekEntries = dateKeys.map((date) => entriesByDate.get(date) || null);
-    const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
     const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
     const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
     const plannedWorkouts = this.getTrackedPlannedWorkoutCount(dateKeys.length, activeWorkoutPlan);
+    const completedWorkouts = this.countCompletedWorkoutsWithMakeup(entriesByDate, start, end, plannedWorkouts);
     const stepTarget = Math.max(0, Number(activeWorkoutPlan?.targetStepsCount || 0));
     const workoutCompliance = plannedWorkouts > 0
       ? Math.min(100, (Math.max(0, completedWorkouts) / plannedWorkouts) * 100)
@@ -1187,6 +1189,17 @@ export class DashboardComponent implements OnInit {
     if (!trackedDays || !plannedWorkoutsPerWeek) return 0;
 
     return Math.max(1, Math.ceil((plannedWorkoutsPerWeek * trackedDays) / 7));
+  }
+
+  private countCompletedWorkoutsWithMakeup(
+    entriesByDate: Map<string, DailyCheckinDay>,
+    start: Date,
+    end: Date,
+    plannedWorkouts: number
+  ): number {
+    const workoutDates = this.getDateKeysBetweenDates(start, this.addDateDays(end, 1));
+    const completed = workoutDates.filter((date) => Boolean(entriesByDate.get(date)?.exerciseDone)).length;
+    return plannedWorkouts > 0 ? Math.min(completed, plannedWorkouts) : completed;
   }
 
   private getActiveWorkoutPlan(value: any): any {

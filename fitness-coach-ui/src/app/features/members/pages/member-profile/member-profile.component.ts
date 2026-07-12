@@ -1643,11 +1643,11 @@ private buildWeeklyConsistencyScore(
     .filter((date) => this.isOnOrAfterMemberActiveStart(date));
   const entriesByDate = new Map(days.map((day) => [day.checkInDate, day]));
   const weekEntries = dateKeys.map((date) => entriesByDate.get(date) || null);
-  const completedWorkouts = weekEntries.filter((entry) => Boolean(entry?.exerciseDone)).length;
   const activeDays = weekEntries.filter((entry) => this.isActiveDailyEntry(entry)).length;
   const totalSteps = weekEntries.reduce((sum, entry) => sum + Math.max(0, Number(entry?.stepsCount || 0)), 0);
   const averageDailySteps = dateKeys.length ? totalSteps / dateKeys.length : 0;
   const plannedWorkouts = this.getTrackedPlannedWorkouts(dateKeys.length);
+  const completedWorkouts = this.countCompletedWorkoutsWithMakeup(entriesByDate, start, end, plannedWorkouts);
   const stepTarget = Math.max(0, Number(this.activeWorkoutPlan?.targetStepsCount || 0));
   const workoutCompliance = this.calculateWorkoutCompliance(completedWorkouts, plannedWorkouts);
   const stepsCompliance = this.calculateStepsCompliance(averageDailySteps, stepTarget);
@@ -1681,6 +1681,18 @@ private getTrackedPlannedWorkouts(trackedDays: number): number {
   if (!trackedDays || !plannedWorkouts) return 0;
   if (trackedDays >= 7) return plannedWorkouts;
   return Math.max(1, Math.ceil((plannedWorkouts * trackedDays) / 7));
+}
+
+private countCompletedWorkoutsWithMakeup(
+  entriesByDate: Map<string, DailyCheckinDay>,
+  start: Date,
+  end: Date,
+  plannedWorkouts: number
+): number {
+  const workoutDates = this.getDateKeysBetween(start, this.addDays(end, 1))
+    .filter((date) => this.isOnOrAfterMemberActiveStart(date));
+  const completed = workoutDates.filter((date) => Boolean(entriesByDate.get(date)?.exerciseDone)).length;
+  return plannedWorkouts > 0 ? Math.min(completed, plannedWorkouts) : completed;
 }
 
 calculateWorkoutCompliance(completedWorkouts: number, plannedWorkouts: number): number {
