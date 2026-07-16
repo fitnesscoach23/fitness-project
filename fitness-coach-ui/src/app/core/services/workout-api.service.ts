@@ -18,6 +18,12 @@ export class WorkoutApiService {
     );
   }
 
+  getWorkoutPlansForMember(memberId: string) {
+    return this.http.get<any[]>(
+      `${environment.workoutApi}/workouts/member/${memberId}/plans`
+    );
+  }
+
   getAllWorkoutPlans() {
   return this.http.get<any[]>(
     `${environment.workoutApi}/workouts`

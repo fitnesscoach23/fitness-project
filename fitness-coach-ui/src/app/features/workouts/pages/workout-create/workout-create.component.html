@@ -61,9 +61,18 @@
   <section *ngIf="memberId && !loadingPlans && memberPlans.length" class="plans-section">
     <div class="section-header">
       <h2>Existing Workout Plans</h2>
+
+      <div class="field-group plan-history-filter">
+        <label for="planHistorySelect">Select Plan By Created Date</label>
+        <select id="planHistorySelect" [(ngModel)]="selectedPlanId">
+          <option *ngFor="let p of memberPlans" [value]="p.id">
+            {{ p.createdAt ? (p.createdAt | date:'mediumDate') : 'Date unavailable' }} - {{ p.title }}
+          </option>
+        </select>
+      </div>
     </div>
 
-    <article *ngFor="let p of memberPlans" class="plan-card">
+    <article *ngFor="let p of selectedMemberPlans" class="plan-card">
       <header class="plan-header">
         <div>
           <ng-container *ngIf="editablePlanId !== p.id; else editablePlanTitle">
@@ -375,6 +384,86 @@
         [(ngModel)]="notes"
         placeholder="Goals, constraints, progression cues, warmup focus, technique reminders"></textarea>
     </div>
+
+    <section class="warmup-section">
+      <div class="warmup-header">
+        <div>
+          <h3>Warmup Exercises</h3>
+          <p>Prepare the joints, target muscles, and movement pattern before the main work.</p>
+        </div>
+        <button type="button" class="btn btn-secondary" (click)="addRowToDay(warmupRows, 'Warmup')">
+          + Add Warmup
+        </button>
+      </div>
+
+      <div class="notes-panel warmup-purpose-panel">
+        <label for="warmupPurpose">Warmup Purpose</label>
+        <textarea
+          id="warmupPurpose"
+          [(ngModel)]="warmupPurpose"
+          placeholder="e.g. Raise core temperature, open hips and shoulders, rehearse first lift pattern"></textarea>
+      </div>
+
+      <div class="table-wrap">
+        <table class="workout-grid warmup-grid">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Exercise</th>
+              <th>Muscle Group</th>
+              <th>Muscles Trained</th>
+              <th>Set</th>
+              <th>Reps / Time</th>
+              <th>Video URL</th>
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr
+              *ngFor="let row of warmupRows; let i = index"
+              class="draggable-row"
+              draggable="true"
+              (dragstart)="onWorkoutRowDragStart(warmupRows, row)"
+              (dragover)="onWorkoutRowDragOver($event)"
+              (drop)="onWorkoutRowDrop(warmupRows, row)"
+              (dragend)="onWorkoutRowDragEnd()">
+              <td class="row-index">{{ i + 1 }}</td>
+              <td>
+                <input
+                  [(ngModel)]="row.exerciseName"
+                  [attr.list]="'exercise-library-options'"
+                  (input)="onExerciseInput(row)"
+                  (blur)="applyExerciseLibraryByName(row)" />
+              </td>
+              <td><input [(ngModel)]="row.muscleGroup" /></td>
+              <td>
+                <textarea
+                  class="muscles-textarea"
+                  [(ngModel)]="row.musclesTrained"
+                  rows="3"></textarea>
+              </td>
+              <td><input type="number" [(ngModel)]="row.setNumber" /></td>
+              <td><input [(ngModel)]="row.reps" placeholder="8-10 or 30 sec" /></td>
+              <td class="video-col">
+                <input [(ngModel)]="row.videoUrl" placeholder="https://..." />
+                <a
+                  *ngIf="row.videoUrl"
+                  class="video-link"
+                  [href]="normalizeVideoUrl(row.videoUrl)"
+                  target="_blank"
+                  rel="noopener noreferrer">
+                  Open
+                </a>
+              </td>
+              <td>
+                <button type="button" class="row-remove" (click)="removeRowFromRows(warmupRows, row)">Remove</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <div class="day-groups">
       <section

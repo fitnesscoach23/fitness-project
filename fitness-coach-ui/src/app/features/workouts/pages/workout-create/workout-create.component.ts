@@ -51,12 +51,15 @@ export class WorkoutCreateComponent implements OnInit {
   title = '';
   notes = '';
   targetStepsCount: number | null = null;
+  warmupPurpose = '';
+  warmupRows: WorkoutGridRow[] = [];
 
   loading = false;
   loadingMembers = true;
   error: string | null = null;
   planId: string | null = null;
   memberPlans: any[] = [];
+  selectedPlanId: string | null = null;
   loadingPlans = false;
   plansError: string | null = null;
   // which plan is currently open in the builder
@@ -75,7 +78,7 @@ deletingPlanId: string | null = null;
 mode: 'VIEW' | 'EDIT' = 'VIEW';
   // create mode
 creatingNewPlan = false;
-newPlanRows: WorkoutGridRow[] = [];
+  newPlanRows: WorkoutGridRow[] = [];
 exerciseLibraryItems: any[] = [];
 loadingExerciseLibraryItems = false;
 
@@ -110,6 +113,7 @@ emptyRow(dayName = ''): WorkoutGridRow {
 
     if (preselectedMemberId) {
       this.memberId = preselectedMemberId;
+      this.loadMemberPlans(preselectedMemberId);
     }
   }
 
@@ -175,14 +179,18 @@ emptyRow(dayName = ''): WorkoutGridRow {
   this.loadingPlans = true;
   this.plansError = null;
 
-  this.workoutApi.getWorkoutPlan(memberId).subscribe({
+  this.workoutApi.getWorkoutPlansForMember(memberId).subscribe({
     next: res => {
   const plans = Array.isArray(res) ? res : res ? [res] : [];
+  const previousSelectedPlanId = this.selectedPlanId;
 
   this.memberPlans = plans.map(p => ({
     ...p,
     gridRows: this.mapPlanToGridLocal(p) // NEW
   }));
+  this.selectedPlanId = this.memberPlans.some((plan) => plan.id === previousSelectedPlanId)
+    ? previousSelectedPlanId
+    : this.memberPlans[0]?.id || null;
 
   this.loadingPlans = false;
 },
@@ -190,6 +198,7 @@ emptyRow(dayName = ''): WorkoutGridRow {
       this.plansError = 'Failed to load workout plans';
       this.loadingPlans = false;
       this.memberPlans = [];
+      this.selectedPlanId = null;
     }
   });
 }
@@ -197,10 +206,18 @@ emptyRow(dayName = ''): WorkoutGridRow {
 onMemberChange() {
   if (!this.memberId) {
     this.memberPlans = [];
+    this.selectedPlanId = null;
     return;
   }
 
   this.loadMemberPlans(this.memberId);
+}
+
+get selectedMemberPlans(): any[] {
+  if (!this.selectedPlanId) return [];
+
+  const selectedPlan = this.memberPlans.find((plan) => plan.id === this.selectedPlanId);
+  return selectedPlan ? [selectedPlan] : [];
 }
 
 editPlan(planId: string) {
@@ -246,6 +263,10 @@ getGroupedRows(rows: WorkoutGridRow[]): WorkoutDayGroup[] {
     dayName,
     rows: dayRows
   }));
+}
+
+emptyWarmupRow(): WorkoutGridRow {
+  return this.emptyRow('Warmup');
 }
 
 updateDayName(rows: WorkoutGridRow[], previousDayName: string, nextDayName: string) {
@@ -412,14 +433,17 @@ getMuscleGroupSummary(rows: WorkoutGridRow[]): MuscleGroupSummary[] {
 }
 
 private getNextDayLabel(rows: WorkoutGridRow[]): string {
-  const dayNumbers = this.getGroupedRows(rows)
+  const workoutDayGroups = this.getGroupedRows(rows)
+    .filter((group) => !this.isWarmupDayName(group.dayName));
+
+  const dayNumbers = workoutDayGroups
     .map((group) => {
       const match = group.dayName.match(/^day\s*(\d+)$/i);
       return match ? Number(match[1]) : null;
     })
     .filter((value): value is number => value != null && Number.isFinite(value));
 
-  const nextNumber = dayNumbers.length ? Math.max(...dayNumbers) + 1 : this.getGroupedRows(rows).length + 1;
+  const nextNumber = dayNumbers.length ? Math.max(...dayNumbers) + 1 : workoutDayGroups.length + 1;
   return `Day ${nextNumber}`;
 }
 
@@ -691,6 +715,8 @@ startCreate() {
   this.title = '';
   this.notes = '';
   this.targetStepsCount = null;
+  this.warmupPurpose = '';
+  this.warmupRows = [this.emptyWarmupRow()];
   this.newPlanRows = [this.emptyRow('Day 1')];
 }
 
@@ -701,8 +727,16 @@ saveAndAssign() {
     return;
   }
 
-  if (!this.validateGrid(this.newPlanRows)) {
-    alert('Please complete all rows');
+  const warmupRows = this.dedupeGridRows(this.warmupRows.filter((row) => this.hasWorkoutRowValue(row)));
+  const workoutRows = this.dedupeGridRows(this.newPlanRows);
+
+  if (!this.validateGrid(workoutRows)) {
+    alert('Please complete all workout rows');
+    return;
+  }
+
+  if (warmupRows.length && !this.validateGrid(warmupRows)) {
+    alert('Please complete all warmup rows or remove the empty warmup row.');
     return;
   }
 
@@ -711,14 +745,14 @@ saveAndAssign() {
   this.workoutApi.createWorkoutPlan({
     memberId: this.memberId,
     title: this.title,
-    notes: this.notes,
+    notes: this.buildPlanNotesWithWarmupPurpose(this.notes, this.warmupPurpose),
     targetStepsCount: this.normalizeTargetStepsCount(this.targetStepsCount)
   })
   .pipe(
     concatMap((planId: string) => {
       const finalPlanId = planId.replace(/"/g, '');
 
-      return this.rebuildPlanFromGrid(finalPlanId, this.newPlanRows).pipe(
+      return this.rebuildPlanFromGrid(finalPlanId, [...warmupRows, ...workoutRows]).pipe(
         concatMap(() =>
           this.workoutApi.assignWorkoutPlan(finalPlanId, this.memberId!)
         )
@@ -741,6 +775,8 @@ saveAndAssign() {
 
 cancelCreate() {
   this.creatingNewPlan = false;
+  this.warmupPurpose = '';
+  this.warmupRows = [];
   this.newPlanRows = [];
   this.targetStepsCount = null;
   this.workoutExcelFileName = '';
@@ -764,7 +800,14 @@ onWorkoutExcelSelected(event: Event) {
     return;
   }
 
-  if (this.creatingNewPlan && this.newPlanRows.some((row) => this.hasWorkoutRowValue(row))) {
+  if (
+    this.creatingNewPlan &&
+    (
+      this.newPlanRows.some((row) => this.hasWorkoutRowValue(row)) ||
+      this.warmupRows.some((row) => this.hasWorkoutRowValue(row)) ||
+      this.warmupPurpose.trim()
+    )
+  ) {
     const confirmed = window.confirm('Replace the current workout plan draft with this Excel import?');
     if (!confirmed) {
       input.value = '';
@@ -791,9 +834,17 @@ onWorkoutExcelSelected(event: Event) {
       }
 
       this.title = imported.title;
-      this.notes = imported.notes;
+      this.notes = this.removeWarmupPurposeFromNotes(imported.notes);
       this.targetStepsCount = imported.targetStepsCount;
-      this.newPlanRows = imported.rows;
+      this.warmupPurpose = this.extractWarmupPurposeFromNotes(imported.notes);
+      this.warmupRows = imported.rows.filter((row) => this.isWarmupDayName(row.dayName));
+      if (!this.warmupRows.length) {
+        this.warmupRows = [this.emptyWarmupRow()];
+      }
+      this.newPlanRows = imported.rows.filter((row) => !this.isWarmupDayName(row.dayName));
+      if (!this.newPlanRows.length) {
+        this.newPlanRows = [this.emptyRow('Day 1')];
+      }
       this.creatingNewPlan = true;
       this.mode = 'EDIT';
       this.workoutExcelMessage = `Imported ${imported.exerciseCount} exercise(s) across ${imported.dayCount} day(s). Review and save when ready.`;
@@ -1055,6 +1106,29 @@ private parseTargetStepsFromText(value: string): number | null {
   if (!match) return null;
 
   return this.normalizeTargetStepsCount(match[1].replace(/,/g, ''));
+}
+
+private buildPlanNotesWithWarmupPurpose(notes: string, warmupPurpose: string): string {
+  const cleanNotes = this.removeWarmupPurposeFromNotes(notes).trim();
+  const cleanPurpose = warmupPurpose.trim();
+
+  if (!cleanPurpose) return cleanNotes;
+  if (!cleanNotes) return `Warmup purpose: ${cleanPurpose}`;
+
+  return `Warmup purpose: ${cleanPurpose}\n\n${cleanNotes}`;
+}
+
+private extractWarmupPurposeFromNotes(notes: string): string {
+  const match = String(notes || '').match(/^warmup purpose:\s*(.+)$/im);
+  return match ? match[1].trim() : '';
+}
+
+private removeWarmupPurposeFromNotes(notes: string): string {
+  return String(notes || '').replace(/^warmup purpose:\s*.*(?:\r?\n){0,2}/im, '').trim();
+}
+
+private isWarmupDayName(dayName: string | null | undefined): boolean {
+  return /^warm\s*-?\s*up$|^warmup$/i.test(String(dayName || '').trim());
 }
 
 private deriveWorkoutImportTitle(firstCell: string, fileName: string): string {

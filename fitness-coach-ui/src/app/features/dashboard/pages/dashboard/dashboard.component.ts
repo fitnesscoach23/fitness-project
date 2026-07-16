@@ -1223,12 +1223,14 @@ export class DashboardComponent implements OnInit {
   }
 
   private isActiveDailyEntry(entry: DailyCheckinDay | null): boolean {
+    if (!entry) return false;
     return Boolean(
-      entry?.exerciseDone
-      || entry?.stepTargetAchieved
-      || entry?.travelWorkout
-      || entry?.recoveryDay
-      || entry?.activeOther
+      entry.exerciseDone
+      || entry.stepTargetAchieved
+      || entry.travelWorkout
+      || entry.recoveryDay
+      || entry.activeOther
+      || Number(entry.stepsCount || 0) > 0
     );
   }
 

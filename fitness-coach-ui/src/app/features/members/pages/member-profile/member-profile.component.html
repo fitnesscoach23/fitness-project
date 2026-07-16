@@ -611,10 +611,67 @@
       </div>
 
       <div class="card weight-card">
-        <h3 class="card-title">Weight Progress</h3>
+        <div
+          class="weight-card-header"
+          style="display: flex; justify-content: space-between; gap: 14px;">
+          <div>
+            <div
+              class="weight-card-kicker"
+              style="color: #0f766e; font-size: 11px; font-weight: 800;">
+              Weight Journey
+            </div>
+            <h3 class="card-title" style="margin: 3px 0 0;">
+              {{ weightProgressHeadline }}
+            </h3>
+            <p style="margin: 6px 0; color: #475569; font-size: 13px;">
+              {{ weightProgressSubtext }}
+            </p>
+          </div>
+          <div
+            class="weight-change-badge"
+            [ngClass]="weightProgressClass"
+            [style.color]="weightProgressClass === 'improved' ? '#0f766e' : weightProgressClass === 'increased' ? '#b91c1c' : '#334155'"
+            style="font-size: 20px; font-weight: 800;">
+            {{ totalWeightChangeLabel }} kg
+          </div>
+        </div>
+
+        <div
+          class="weight-journey-stats"
+          style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px;">
+          <div style="padding: 10px;">
+            <span style="display: block; color: #64748b; font-size: 11px;">Started</span>
+            <strong style="display: block; margin-top: 5px; color: #0f172a; font-size: 18px;">
+              {{ startingWeight | number:'1.1-1' }} kg
+            </strong>
+            <small style="display: block; color: #64748b; font-size: 11px;">{{ startingWeightDate }}</small>
+          </div>
+          <div style="padding: 10px;">
+            <span style="display: block; color: #64748b; font-size: 11px;">Now</span>
+            <strong style="display: block; margin-top: 5px; color: #0f172a; font-size: 18px;">
+              {{ latestWeight | number:'1.1-1' }} kg
+            </strong>
+            <small style="display: block; color: #64748b; font-size: 11px;">{{ latestWeightDate }}</small>
+          </div>
+          <div style="padding: 10px;">
+            <span style="display: block; color: #64748b; font-size: 11px;">Since last</span>
+            <strong
+              [ngClass]="{
+                'positive': weightChange < 0,
+                'negative': weightChange > 0
+              }"
+              [style.color]="weightChange < 0 ? '#0f766e' : weightChange > 0 ? '#b91c1c' : '#0f172a'"
+              style="display: block; margin-top: 5px; font-size: 18px;">
+              {{ weightChange > 0 ? '+' : '' }}{{ weightChange | number:'1.1-1' }} kg
+            </strong>
+            <small style="display: block; color: #64748b; font-size: 11px;">Latest check-in</small>
+          </div>
+        </div>
+
         <div class="chart-wrapper">
           <canvas id="weightChart"></canvas>
         </div>
+
       </div>
     </div>
 

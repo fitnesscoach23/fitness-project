@@ -70,6 +70,11 @@ public class WorkoutController {
         return ResponseEntity.ok(service.getPlan(current.coachEmail(), planId));
     }
 
+    @GetMapping("/member/{memberId}/plans")
+    public ResponseEntity<?> listMemberPlans(@PathVariable UUID memberId) {
+        return ResponseEntity.ok(service.listMemberPlans(current.coachEmail(), memberId));
+    }
+
     @GetMapping
     public ResponseEntity<?> listAllPlans() {
         return ResponseEntity.ok(service.listPlans(current.coachEmail()));

@@ -78,6 +78,11 @@ type WeeklyConsistencyScore = {
   ratingColor: string;
   ratingClass: WeeklyScoreRating['className'];
 };
+type WeightProgressPoint = {
+  label: string;
+  weight: number;
+  changeFromStart: number;
+};
 
 @Component({
   selector: 'app-member-profile',
@@ -173,8 +178,13 @@ export class MemberProfileComponent implements OnInit {
   activeSection: 'overview' | 'bodyMetrics' | 'billing' | 'progress' | 'dailyConsistency' | 'workout' | 'diet' = 'overview';
   totalPaid = 0;
   totalPending = 0;
+  startingWeight = 0;
+  startingWeightDate = '-';
   latestWeight = 0;
+  latestWeightDate = '-';
   weightChange = 0;
+  totalWeightChange = 0;
+  weightChangePercent = 0;
   avgDietAdherence = 0;
   avgSteps = 0;
   deletingMember = false;
@@ -1507,7 +1517,8 @@ renderCharts() {
 }
 
 renderWeightChart() {
-  if (this.progressCheckins.length === 0) return;
+  const points = this.getWeightProgressPoints();
+  if (points.length === 0) return;
 
   const canvas = document.getElementById('weightChart') as HTMLCanvasElement | null;
   if (!canvas) return;
@@ -1517,14 +1528,18 @@ renderWeightChart() {
     existing.destroy();
   }
 
-  const sorted = [...this.progressCheckins].sort(
-    (a, b) =>
-      this.getCheckinDateValue(a.submittedAt) -
-      this.getCheckinDateValue(b.submittedAt)
-  );
+  const context = canvas.getContext('2d');
+  const gradient = context?.createLinearGradient(0, 0, 0, 320);
+  gradient?.addColorStop(0, 'rgba(20, 184, 166, 0.28)');
+  gradient?.addColorStop(0.48, 'rgba(59, 130, 246, 0.1)');
+  gradient?.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-  const labels = sorted.map(c => this.formatProgressCheckinDate(c.submittedAt));
-  const weights = sorted.map(c => c.weight);
+  const labels = points.map(point => point.label);
+  const weights = points.map(point => point.weight);
+  const latestPointIndex = weights.length - 1;
+  const minWeight = Math.min(...weights);
+  const maxWeight = Math.max(...weights);
+  const padding = Math.max(0.4, (maxWeight - minWeight) * 0.24);
 
   new Chart(canvas, {
     type: 'line',
@@ -1534,12 +1549,145 @@ renderWeightChart() {
         {
           label: 'Weight (kg)',
           data: weights,
-          borderWidth: 2,
-          tension: 0.3
+          borderColor: '#0f766e',
+          backgroundColor: gradient || 'rgba(20, 184, 166, 0.14)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.42,
+          pointRadius: points.map((_point, index) => index === 0 || index === latestPointIndex ? 6 : 4),
+          pointHoverRadius: 8,
+          pointBackgroundColor: points.map((_point, index) => {
+            if (index === 0) return '#f59e0b';
+            if (index === latestPointIndex) return '#0f766e';
+            return '#ffffff';
+          }),
+          pointBorderColor: points.map((_point, index) => {
+            if (index === 0) return '#f59e0b';
+            if (index === latestPointIndex) return '#0f766e';
+            return '#38bdf8';
+          }),
+          pointBorderWidth: 3
         }
       ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 900,
+        easing: 'easeOutQuart'
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#ffffff',
+          bodyColor: '#e2e8f0',
+          displayColors: false,
+          padding: 12,
+          callbacks: {
+            title: (items) => items[0]?.label || '',
+            label: (item) => {
+              const point = points[item.dataIndex];
+              const prefix = point.changeFromStart > 0 ? '+' : '';
+              return [
+                `Weight: ${point.weight.toFixed(1)} kg`,
+                `From start: ${prefix}${point.changeFromStart.toFixed(1)} kg`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: '#64748b',
+            maxRotation: 35,
+            minRotation: 0
+          }
+        },
+        y: {
+          min: Math.max(0, minWeight - padding),
+          max: maxWeight + padding,
+          border: {
+            display: false
+          },
+          grid: {
+            color: 'rgba(148, 163, 184, 0.18)'
+          },
+          ticks: {
+            color: '#64748b',
+            callback: (value) => `${Number(value).toFixed(1)} kg`
+          }
+        }
+      }
     }
   });
+}
+
+get weightProgressClass(): string {
+  if (this.totalWeightChange < 0) return 'improved';
+  if (this.totalWeightChange > 0) return 'increased';
+  return 'stable';
+}
+
+get totalWeightChangeLabel(): string {
+  return this.formatSignedWeight(this.totalWeightChange);
+}
+
+get weightProgressHeadline(): string {
+  if (!this.progressCheckins?.length) return 'Progress is ready to begin';
+  if (this.totalWeightChange < 0) return 'You are lighter than where you started';
+  if (this.totalWeightChange > 0) return 'Your weight is up from the starting point';
+  return 'You are holding steady';
+}
+
+get weightProgressSubtext(): string {
+  if (!this.progressCheckins?.length) return 'Add check-ins to build the weight journey.';
+
+  const totalLabel = this.formatSignedWeight(this.totalWeightChange);
+  const percentLabel = Math.abs(this.weightChangePercent).toFixed(1);
+
+  if (this.totalWeightChange < 0) {
+    return `${totalLabel} kg from start, ${percentLabel}% down overall.`;
+  }
+
+  if (this.totalWeightChange > 0) {
+    return `${totalLabel} kg from start, ${percentLabel}% up overall.`;
+  }
+
+  return 'No overall weight change from the first check-in.';
+}
+
+private getWeightProgressPoints(): WeightProgressPoint[] {
+  const sorted = [...(this.progressCheckins || [])]
+    .filter(checkin => Number.isFinite(Number(checkin?.weight)))
+    .sort((a, b) => this.getCheckinDateValue(a.submittedAt) - this.getCheckinDateValue(b.submittedAt));
+
+  const startWeight = Number(sorted[0]?.weight || 0);
+
+  return sorted.map(checkin => {
+    const weight = Number(checkin.weight);
+    return {
+      label: this.formatProgressCheckinDate(checkin.submittedAt),
+      weight,
+      changeFromStart: this.roundToTwo(weight - startWeight)
+    };
+  });
+}
+
+private formatSignedWeight(value: number): string {
+  const rounded = this.roundToTwo(value);
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(1)}`;
 }
 
 
@@ -3206,19 +3354,41 @@ getComparisonNotes(checkin: any): string {
 }
 
 calculateProgressSummary() {
-  if (!this.progressCheckins?.length) return;
+  if (!this.progressCheckins?.length) {
+    this.startingWeight = 0;
+    this.startingWeightDate = '-';
+    this.latestWeight = 0;
+    this.latestWeightDate = '-';
+    this.weightChange = 0;
+    this.totalWeightChange = 0;
+    this.weightChangePercent = 0;
+    this.avgDietAdherence = 0;
+    this.avgSteps = 0;
+    return;
+  }
 
   const sorted = [...this.progressCheckins]
+    .filter(checkin => Number.isFinite(Number(checkin?.weight)))
     .sort((a, b) => this.getCheckinDateValue(a.submittedAt) - this.getCheckinDateValue(b.submittedAt));
 
+  if (!sorted.length) return;
+
+  const first = sorted[0];
   const last = sorted[sorted.length - 1];
   const previous = sorted.length > 1 ? sorted[sorted.length - 2] : null;
 
-  this.latestWeight = last.weight || 0;
-  this.weightChange = this.roundToTwo((last.weight || 0) - (previous?.weight || 0));
+  this.startingWeight = Number(first.weight || 0);
+  this.startingWeightDate = this.formatProgressCheckinDate(first.submittedAt);
+  this.latestWeight = Number(last.weight || 0);
+  this.latestWeightDate = this.formatProgressCheckinDate(last.submittedAt);
+  this.weightChange = this.roundToTwo(this.latestWeight - Number(previous?.weight || this.latestWeight));
+  this.totalWeightChange = this.roundToTwo(this.latestWeight - this.startingWeight);
+  this.weightChangePercent = this.startingWeight > 0
+    ? this.roundToTwo((this.totalWeightChange / this.startingWeight) * 100)
+    : 0;
 
-  const validDiet = sorted.filter(c => c.dietAdherence);
-  const validSteps = sorted.filter(c => c.stepsAvg != null);
+  const validDiet = this.progressCheckins.filter(c => c.dietAdherence);
+  const validSteps = this.progressCheckins.filter(c => c.stepsAvg != null);
 
   this.avgDietAdherence =
     validDiet.reduce((sum, c) => sum + c.dietAdherence, 0) / (validDiet.length || 1);

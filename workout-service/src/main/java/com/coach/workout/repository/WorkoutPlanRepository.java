@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface WorkoutPlanRepository extends JpaRepository<WorkoutPlan, UUID> {
     List<WorkoutPlan> findByMemberId(UUID memberId);
+    List<WorkoutPlan> findByMemberIdAndCoachEmailOrderByCreatedAtDesc(UUID memberId, String coachEmail);
     List<WorkoutPlan> findByCoachEmail(String coachEmail);
 
 }

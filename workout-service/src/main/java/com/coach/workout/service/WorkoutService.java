@@ -171,6 +171,15 @@ public class WorkoutService {
                 .toList();
     }
 
+    public List<WorkoutPlanResponse> listMemberPlans(String coachEmail, UUID memberId) {
+
+        List<WorkoutPlan> plans = planRepo.findByMemberIdAndCoachEmailOrderByCreatedAtDesc(memberId, coachEmail);
+
+        return plans.stream()
+                .map(plan -> getPlan(coachEmail, plan.getId()))
+                .toList();
+    }
+
     @Transactional
     public void saveExercise(
             String coachEmail,
