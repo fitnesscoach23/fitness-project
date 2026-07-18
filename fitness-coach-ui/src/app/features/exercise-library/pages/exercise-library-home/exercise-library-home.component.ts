@@ -255,12 +255,13 @@ export class ExerciseLibraryHomeComponent implements OnInit {
 
   private importRows(rows: ImportRow[], done: () => void) {
     this.importing = true;
+    const startingSrNo = this.getNextSrNo();
 
     from(rows)
       .pipe(
-        concatMap((row) => {
+        concatMap((row, index) => {
           const payload: ExerciseLibraryPayload = {
-            srNo: row.srNo,
+            srNo: startingSrNo + index,
             muscleGroup: row.muscleGroup,
             exerciseName: row.exerciseName,
             musclesTrained: row.musclesTrained,
