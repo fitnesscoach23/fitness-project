@@ -69,10 +69,25 @@
           <label>Record Manual Payment</label>
           <div class="inline-form">
             <input type="number" placeholder="Amount" [(ngModel)]="paymentAmount" />
-            <input type="date" [ngModel]="manualPaymentDate" readonly />
+            <input
+              type="date"
+              [(ngModel)]="manualPaymentDate"
+              [readonly]="!manualPaymentIsProrated" />
             <button class="primary-btn" (click)="startManualPayment()" [disabled]="paymentActionLoading">
               {{ paymentActionLoading ? 'Processing...' : 'Confirm' }}
             </button>
+          </div>
+          <label class="checkbox-row manual-payment-option">
+            <input
+              type="checkbox"
+              [(ngModel)]="manualPaymentIsProrated"
+              (ngModelChange)="onManualPaymentProratedChange()" />
+            Prorated cycle adjustment
+          </label>
+          <div class="form-hint">
+            {{ manualPaymentIsProrated
+              ? 'Use the date as the covered-until renewal date.'
+              : 'Full-cycle payment will move renewal ahead by the selected cycle.' }}
           </div>
           <div *ngIf="paymentActionError" class="error">{{ paymentActionError }}</div>
         </div>

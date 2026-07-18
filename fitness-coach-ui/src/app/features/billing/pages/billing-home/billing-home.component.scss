@@ -144,6 +144,22 @@ select:focus {
   height: auto;
 }
 
+.manual-payment-option {
+  margin-top: 12px;
+  margin-bottom: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.form-hint {
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* BUTTON SYSTEM */
 .primary-btn {
   height: 46px;

@@ -76,6 +76,7 @@ export class BillingHomeComponent implements OnInit {
   memberStatusUpdating = false;
   memberStatusError: string | null = null;
   manualPaymentDate = new Date().toISOString().slice(0, 10);
+  manualPaymentIsProrated = false;
   billingReminderStatus = '';
   sendingBillingReminderWhatsApp = false;
 
@@ -257,6 +258,10 @@ export class BillingHomeComponent implements OnInit {
     }
   }
 
+  onManualPaymentProratedChange(): void {
+    this.syncManualPaymentDateWithRenewalDate(true);
+  }
+
   saveSubscriptionOverride(): void {
     this.overrideMessage = null;
 
@@ -400,7 +405,7 @@ export class BillingHomeComponent implements OnInit {
         this.paymentActionLoading = false;
         this.paymentAmount = null;
         if (this.isSuccessfulPayment(createdPayment)) {
-          this.applyRenewalOverrideFromPaymentDate(paymentDate);
+          this.applyRenewalOverrideFromPaymentDate(paymentDate, this.manualPaymentIsProrated);
           this.clearDashboardBillingSnapshotForSelectedMember();
         }
         this.loadSelectedMemberBilling();
@@ -913,11 +918,19 @@ export class BillingHomeComponent implements OnInit {
   }
 
   private getRenewalDateForManualPayment(): string {
+    if (this.manualPaymentIsProrated) {
+      return this.normalizeDateInput(this.manualPaymentDate)
+        || this.normalizeDateInput(this.displayedRenewalDate)
+        || this.getTodayDateInput();
+    }
+
     return this.normalizeDateInput(this.displayedRenewalDate) || this.getTodayDateInput();
   }
 
-  private syncManualPaymentDateWithRenewalDate(): void {
-    this.manualPaymentDate = this.getRenewalDateForManualPayment();
+  private syncManualPaymentDateWithRenewalDate(force = false): void {
+    if (force || !this.manualPaymentIsProrated || !this.manualPaymentDate) {
+      this.manualPaymentDate = this.getRenewalDateForManualPayment();
+    }
   }
 
   private finalizeStartedManualPayment(paymentId: string, paymentDate: string): void {
@@ -925,7 +938,7 @@ export class BillingHomeComponent implements OnInit {
       next: () => {
         this.paymentActionLoading = false;
         this.paymentAmount = null;
-        this.applyRenewalOverrideFromPaymentDate(paymentDate);
+        this.applyRenewalOverrideFromPaymentDate(paymentDate, this.manualPaymentIsProrated);
         this.clearDashboardBillingSnapshotForSelectedMember();
         this.loadSelectedMemberBilling();
         this.loadAllMemberBilling();
@@ -951,11 +964,13 @@ export class BillingHomeComponent implements OnInit {
     return String(payment?.status || payment?.payment?.status || '').toUpperCase() === 'SUCCESS';
   }
 
-  private applyRenewalOverrideFromPaymentDate(paymentDate: string): void {
+  private applyRenewalOverrideFromPaymentDate(paymentDate: string, keepRenewalOnPaymentDate = false): void {
     if (!this.selectedMemberId) return;
 
     const paidOn = this.normalizeDateInput(paymentDate) || this.getTodayDateInput();
-    const nextRenewal = this.addMonths(paidOn, this.getCycleMonths(this.overrideCycle));
+    const nextRenewal = keepRenewalOnPaymentDate
+      ? paidOn
+      : this.addMonths(paidOn, this.getCycleMonths(this.overrideCycle));
     const activeSince = this.getSelectedMemberCreatedDate() || this.overrideActiveSince || paidOn;
     const payload = {
       activeSince,
