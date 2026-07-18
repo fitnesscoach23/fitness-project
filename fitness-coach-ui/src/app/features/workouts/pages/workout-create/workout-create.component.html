@@ -149,7 +149,9 @@
       <div class="day-groups">
         <section
           class="day-group-card"
-          *ngFor="let group of getGroupedRows(p.gridRows); trackBy: trackByDayGroup">
+          *ngFor="let group of getGroupedRows(p.gridRows); trackBy: trackByDayGroup"
+          (dragover)="onWorkoutDayDragOver($event)"
+          (drop)="onWorkoutDayDrop(p.gridRows, group.dayName, $event)">
           <div class="day-group-header">
             <div class="day-title-wrap">
               <label>Day</label>
@@ -161,6 +163,29 @@
             </div>
 
             <div class="day-actions" *ngIf="editablePlanId === p.id">
+              <button
+                type="button"
+                class="day-reorder-handle"
+                draggable="true"
+                title="Drag to reorder day"
+                (dragstart)="onWorkoutDayDragStart(p.gridRows, group.dayName, $event)"
+                (dragend)="onWorkoutDayDragEnd()">
+                Drag
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary compact-day-btn"
+                (click)="moveDay(p.gridRows, group.dayName, -1)"
+                [disabled]="!canMoveDay(p.gridRows, group.dayName, -1)">
+                Up
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary compact-day-btn"
+                (click)="moveDay(p.gridRows, group.dayName, 1)"
+                [disabled]="!canMoveDay(p.gridRows, group.dayName, 1)">
+                Down
+              </button>
               <div class="copy-day-controls" *ngIf="getCopySourceOptions(p.gridRows, group.dayName).length">
                 <select
                   [ngModel]="getCopySourceValue(p.gridRows, group.dayName)"
@@ -206,9 +231,9 @@
                   *ngFor="let row of group.rows; let i = index"
                   [class.draggable-row]="editablePlanId === p.id"
                   [attr.draggable]="editablePlanId === p.id ? true : null"
-                  (dragstart)="onWorkoutRowDragStart(p.gridRows, row)"
+                  (dragstart)="onWorkoutRowDragStart(p.gridRows, row, $event)"
                   (dragover)="onWorkoutRowDragOver($event)"
-                  (drop)="onWorkoutRowDrop(p.gridRows, row)"
+                  (drop)="onWorkoutRowDrop(p.gridRows, row, $event)"
                   (dragend)="onWorkoutRowDragEnd()">
                   <td class="row-index">{{ i + 1 }}</td>
                   <td>
@@ -424,9 +449,9 @@
               *ngFor="let row of warmupRows; let i = index"
               class="draggable-row"
               draggable="true"
-              (dragstart)="onWorkoutRowDragStart(warmupRows, row)"
+              (dragstart)="onWorkoutRowDragStart(warmupRows, row, $event)"
               (dragover)="onWorkoutRowDragOver($event)"
-              (drop)="onWorkoutRowDrop(warmupRows, row)"
+              (drop)="onWorkoutRowDrop(warmupRows, row, $event)"
               (dragend)="onWorkoutRowDragEnd()">
               <td class="row-index">{{ i + 1 }}</td>
               <td>
@@ -468,7 +493,9 @@
     <div class="day-groups">
       <section
         class="day-group-card"
-        *ngFor="let group of getGroupedRows(newPlanRows); trackBy: trackByDayGroup">
+        *ngFor="let group of getGroupedRows(newPlanRows); trackBy: trackByDayGroup"
+        (dragover)="onWorkoutDayDragOver($event)"
+        (drop)="onWorkoutDayDrop(newPlanRows, group.dayName, $event)">
         <div class="day-group-header">
           <div class="day-title-wrap">
             <label>Day</label>
@@ -479,6 +506,29 @@
           </div>
 
           <div class="day-actions">
+            <button
+              type="button"
+              class="day-reorder-handle"
+              draggable="true"
+              title="Drag to reorder day"
+              (dragstart)="onWorkoutDayDragStart(newPlanRows, group.dayName, $event)"
+              (dragend)="onWorkoutDayDragEnd()">
+              Drag
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary compact-day-btn"
+              (click)="moveDay(newPlanRows, group.dayName, -1)"
+              [disabled]="!canMoveDay(newPlanRows, group.dayName, -1)">
+              Up
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary compact-day-btn"
+              (click)="moveDay(newPlanRows, group.dayName, 1)"
+              [disabled]="!canMoveDay(newPlanRows, group.dayName, 1)">
+              Down
+            </button>
             <div class="copy-day-controls" *ngIf="getCopySourceOptions(newPlanRows, group.dayName).length">
               <select
                 [ngModel]="getCopySourceValue(newPlanRows, group.dayName)"
@@ -524,9 +574,9 @@
                 *ngFor="let row of group.rows; let i = index"
                 class="draggable-row"
                 draggable="true"
-                (dragstart)="onWorkoutRowDragStart(newPlanRows, row)"
+                (dragstart)="onWorkoutRowDragStart(newPlanRows, row, $event)"
                 (dragover)="onWorkoutRowDragOver($event)"
-                (drop)="onWorkoutRowDrop(newPlanRows, row)"
+                (drop)="onWorkoutRowDrop(newPlanRows, row, $event)"
                 (dragend)="onWorkoutRowDragEnd()">
                 <td class="row-index">{{ i + 1 }}</td>
                 <td>

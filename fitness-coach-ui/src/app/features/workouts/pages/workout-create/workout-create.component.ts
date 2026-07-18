@@ -43,6 +43,7 @@ export class WorkoutCreateComponent implements OnInit {
   private readonly rowIdentityMap = new WeakMap<WorkoutGridRow, number>();
   private rowIdentityCounter = 0;
   private draggedRowContext: { rows: WorkoutGridRow[]; row: WorkoutGridRow } | null = null;
+  private draggedDayContext: { rows: WorkoutGridRow[]; dayName: string } | null = null;
   private readonly copyDaySelectionMap = new WeakMap<WorkoutGridRow[], Map<string, string>>();
 
   members: any[] = [];
@@ -301,6 +302,29 @@ removeDayFromRows(rows: WorkoutGridRow[], dayName: string) {
   rows.splice(0, rows.length, ...remainingRows);
 }
 
+moveDay(rows: WorkoutGridRow[], dayName: string, direction: -1 | 1): void {
+  const groups = this.getGroupedRows(rows);
+  const sourceIndex = groups.findIndex((group) => group.dayName === dayName);
+  const targetIndex = sourceIndex + direction;
+
+  if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= groups.length) {
+    return;
+  }
+
+  const reorderedGroups = [...groups];
+  const [movedGroup] = reorderedGroups.splice(sourceIndex, 1);
+  reorderedGroups.splice(targetIndex, 0, movedGroup);
+  this.replaceRowsWithGroups(rows, reorderedGroups);
+  this.renumberStandardDayNames(rows);
+}
+
+canMoveDay(rows: WorkoutGridRow[], dayName: string, direction: -1 | 1): boolean {
+  const groups = this.getGroupedRows(rows);
+  const index = groups.findIndex((group) => group.dayName === dayName);
+  const nextIndex = index + direction;
+  return index >= 0 && nextIndex >= 0 && nextIndex < groups.length;
+}
+
 getCopySourceOptions(rows: WorkoutGridRow[], targetDayName: string): string[] {
   return this.getGroupedRows(rows)
     .map((group) => group.dayName)
@@ -355,7 +379,51 @@ trackByWorkoutRow(_index: number, row: WorkoutGridRow) {
   return this.getRowIdentity(row);
 }
 
-onWorkoutRowDragStart(rows: WorkoutGridRow[], row: WorkoutGridRow): void {
+onWorkoutDayDragStart(rows: WorkoutGridRow[], dayName: string, event?: DragEvent): void {
+  event?.stopPropagation();
+  this.draggedDayContext = { rows, dayName };
+}
+
+onWorkoutDayDragOver(event: DragEvent): void {
+  if (!this.draggedDayContext) return;
+  event.preventDefault();
+}
+
+onWorkoutDayDrop(rows: WorkoutGridRow[], targetDayName: string, event?: DragEvent): void {
+  event?.preventDefault();
+  event?.stopPropagation();
+
+  if (!this.draggedDayContext || this.draggedDayContext.rows !== rows) return;
+
+  const sourceDayName = this.draggedDayContext.dayName;
+  if (sourceDayName === targetDayName) {
+    this.draggedDayContext = null;
+    return;
+  }
+
+  const groups = this.getGroupedRows(rows);
+  const sourceIndex = groups.findIndex((group) => group.dayName === sourceDayName);
+  const targetIndex = groups.findIndex((group) => group.dayName === targetDayName);
+
+  if (sourceIndex < 0 || targetIndex < 0) {
+    this.draggedDayContext = null;
+    return;
+  }
+
+  const reorderedGroups = [...groups];
+  const [movedGroup] = reorderedGroups.splice(sourceIndex, 1);
+  reorderedGroups.splice(targetIndex, 0, movedGroup);
+  this.replaceRowsWithGroups(rows, reorderedGroups);
+  this.renumberStandardDayNames(rows);
+  this.draggedDayContext = null;
+}
+
+onWorkoutDayDragEnd(): void {
+  this.draggedDayContext = null;
+}
+
+onWorkoutRowDragStart(rows: WorkoutGridRow[], row: WorkoutGridRow, event?: DragEvent): void {
+  event?.stopPropagation();
   this.draggedRowContext = { rows, row };
 }
 
@@ -363,7 +431,10 @@ onWorkoutRowDragOver(event: DragEvent): void {
   event.preventDefault();
 }
 
-onWorkoutRowDrop(rows: WorkoutGridRow[], targetRow: WorkoutGridRow): void {
+onWorkoutRowDrop(rows: WorkoutGridRow[], targetRow: WorkoutGridRow, event?: DragEvent): void {
+  event?.preventDefault();
+  event?.stopPropagation();
+
   if (!this.draggedRowContext || this.draggedRowContext.rows !== rows) return;
 
   const sourceRow = this.draggedRowContext.row;
@@ -993,6 +1064,26 @@ private getDayCopySelections(rows: WorkoutGridRow[]): Map<string, string> {
   }
 
   return selections;
+}
+
+private replaceRowsWithGroups(rows: WorkoutGridRow[], groups: WorkoutDayGroup[]): void {
+  rows.splice(0, rows.length, ...groups.flatMap((group) => group.rows));
+}
+
+private renumberStandardDayNames(rows: WorkoutGridRow[]): void {
+  const groups = this.getGroupedRows(rows);
+  const workoutGroups = groups.filter((group) => !this.isWarmupDayName(group.dayName));
+
+  if (!workoutGroups.length || !workoutGroups.every((group) => /^day\s*\d+$/i.test(group.dayName.trim()))) {
+    return;
+  }
+
+  workoutGroups.forEach((group, index) => {
+    const nextDayName = `Day ${index + 1}`;
+    group.rows.forEach((row) => {
+      row.dayName = nextDayName;
+    });
+  });
 }
 
 private normalizeTargetStepsCount(value: number | string | null | undefined): number | null {
