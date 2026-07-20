@@ -131,10 +131,34 @@
           <option *ngFor="let group of muscleGroupOptions" [value]="group">{{ group }}</option>
         </select>
       </div>
+
+      <div class="field-group tag-filter-field" *ngIf="muscleTagOptions.length > 0">
+        <div class="tag-filter-head">
+          <label>Muscle Tags</label>
+          <button
+            *ngIf="selectedMuscleTags.length > 0"
+            type="button"
+            class="clear-tags-btn"
+            (click)="clearMuscleTags()">
+            Clear
+          </button>
+        </div>
+
+        <div class="tag-list">
+          <button
+            *ngFor="let tag of muscleTagOptions"
+            type="button"
+            class="tag-chip"
+            [class.selected]="isMuscleTagSelected(tag)"
+            (click)="toggleMuscleTag(tag)">
+            {{ tag }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div *ngIf="!loadingExercises && exercises.length > 0 && !filteredExercises.length" class="state-card">
-      No exercises match your search or muscle group filter.
+      No exercises match your search, muscle group, or selected tags.
     </div>
 
     <div class="table-wrap" *ngIf="!loadingExercises && filteredExercises.length > 0">

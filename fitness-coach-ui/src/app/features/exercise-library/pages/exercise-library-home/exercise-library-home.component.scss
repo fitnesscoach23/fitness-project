@@ -155,6 +155,57 @@
   margin-bottom: 14px;
 }
 
+.tag-filter-field {
+  grid-column: 1 / -1;
+}
+
+.tag-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clear-tags-btn {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tag-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tag-chip {
+  flex: 0 0 auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tag-chip:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.tag-chip.selected {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
 .search-field input,
 .sort-field select {
   width: 100%;

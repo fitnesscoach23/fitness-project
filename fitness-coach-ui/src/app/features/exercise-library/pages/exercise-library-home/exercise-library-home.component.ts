@@ -37,6 +37,7 @@ export class ExerciseLibraryHomeComponent implements OnInit {
   loadingExercises = true;
   searchTerm = '';
   selectedMuscleGroup = '';
+  selectedMuscleTags: string[] = [];
 
   error: string | null = null;
   formError: string | null = null;
@@ -68,11 +69,13 @@ export class ExerciseLibraryHomeComponent implements OnInit {
   get filteredExercises(): any[] {
     const search = this.searchTerm.trim().toLowerCase();
     const selectedGroup = this.selectedMuscleGroup.trim().toLowerCase();
+    const selectedTags = this.selectedMuscleTags.map((tag) => this.normalizeTag(tag));
 
     return this.exercises.filter((exercise) => {
       const muscleGroup = String(exercise?.muscleGroup || '').toLowerCase();
       const exerciseName = String(exercise?.exerciseName || '').toLowerCase();
       const musclesTrained = String(exercise?.musclesTrained || '').toLowerCase();
+      const exerciseTags = this.getExerciseTagKeys(exercise);
 
       const matchesSearch =
         !search ||
@@ -81,8 +84,9 @@ export class ExerciseLibraryHomeComponent implements OnInit {
         musclesTrained.includes(search);
 
       const matchesGroup = !selectedGroup || muscleGroup === selectedGroup;
+      const matchesTags = selectedTags.every((tag) => exerciseTags.includes(tag));
 
-      return matchesSearch && matchesGroup;
+      return matchesSearch && matchesGroup && matchesTags;
     });
   }
 
@@ -94,6 +98,21 @@ export class ExerciseLibraryHomeComponent implements OnInit {
           .filter((group) => !!group)
       )
     ).sort((a, b) => a.localeCompare(b));
+  }
+
+  get muscleTagOptions(): string[] {
+    const tagMap = new Map<string, string>();
+
+    this.exercises.forEach((exercise) => {
+      this.parseMuscleTags(exercise?.musclesTrained).forEach((tag) => {
+        const key = this.normalizeTag(tag);
+        if (key && !tagMap.has(key)) {
+          tagMap.set(key, tag);
+        }
+      });
+    });
+
+    return Array.from(tagMap.values()).sort((a, b) => a.localeCompare(b));
   }
 
   ngOnInit(): void {
@@ -190,6 +209,26 @@ export class ExerciseLibraryHomeComponent implements OnInit {
 
   cancelEdit() {
     this.resetForm();
+  }
+
+  isMuscleTagSelected(tag: string): boolean {
+    const normalizedTag = this.normalizeTag(tag);
+    return this.selectedMuscleTags.some((selectedTag) => this.normalizeTag(selectedTag) === normalizedTag);
+  }
+
+  toggleMuscleTag(tag: string) {
+    if (this.isMuscleTagSelected(tag)) {
+      this.selectedMuscleTags = this.selectedMuscleTags.filter(
+        (selectedTag) => this.normalizeTag(selectedTag) !== this.normalizeTag(tag)
+      );
+      return;
+    }
+
+    this.selectedMuscleTags = [...this.selectedMuscleTags, tag];
+  }
+
+  clearMuscleTags() {
+    this.selectedMuscleTags = [];
   }
 
   deleteExercise(exerciseId: string) {
@@ -361,6 +400,26 @@ export class ExerciseLibraryHomeComponent implements OnInit {
     if (!trimmed) return '';
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
     return `https://${trimmed}`;
+  }
+
+  private parseMuscleTags(value: string | null | undefined): string[] {
+    return String(value || '')
+      .split(/[,;\n]+/)
+      .map((tag) => tag.trim())
+      .filter((tag) => !!tag);
+  }
+
+  private normalizeTag(tag: string): string {
+    return tag
+      .toLowerCase()
+      .replace(/\s*\(\s*/g, '(')
+      .replace(/\s*\)\s*/g, ')')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private getExerciseTagKeys(exercise: any): string[] {
+    return this.parseMuscleTags(exercise?.musclesTrained).map((tag) => this.normalizeTag(tag));
   }
 
   private isValidOptionalVideoUrl(url: string): boolean {
