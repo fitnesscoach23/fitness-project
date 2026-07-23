@@ -19,6 +19,10 @@ import {
   DailyCheckinDay
 } from '../../../../core/services/daily-checkin-api.service';
 import { NotificationApiService } from '../../../../core/api/notification-api.service';
+import {
+  CoachingPhasePayload,
+  ProgressPlannerApiService
+} from '../../../../core/api/progress-planner-api.service';
 
 declare const XLSX: any;
 
@@ -175,7 +179,18 @@ export class MemberProfileComponent implements OnInit {
     saturate: 112,
     clarity: 18
   };
-  activeSection: 'overview' | 'bodyMetrics' | 'billing' | 'progress' | 'dailyConsistency' | 'workout' | 'diet' = 'overview';
+  activeSection: 'overview' | 'bodyMetrics' | 'billing' | 'progress' | 'dailyConsistency' | 'workout' | 'diet' | 'progressPlanner' = 'overview';
+  progressPlannerLoading = false;
+  progressPlannerError: string | null = null;
+  progressPlanner: any = null;
+  currentPhase: any = null;
+  phaseTimeline: any[] = [];
+  phaseSaving = false;
+  phaseActionMessage: string | null = null;
+  showPhaseForm = false;
+  phaseFormMode: 'create' | 'edit' = 'create';
+  editingPhaseId: string | null = null;
+  phaseForm: CoachingPhasePayload = this.createEmptyPhaseForm();
   totalPaid = 0;
   totalPending = 0;
   startingWeight = 0;
@@ -479,6 +494,163 @@ export class MemberProfileComponent implements OnInit {
     if (section === 'progress') {
       setTimeout(() => this.renderWeightChart(), 0);
     }
+
+    if (section === 'progressPlanner') {
+      this.loadProgressPlanner();
+    }
+  }
+
+  private createEmptyPhaseForm(): CoachingPhasePayload {
+    const today = this.getTodayDateInput();
+    return {
+      phaseName: '',
+      goal: '',
+      startDate: today,
+      plannedEndDate: '',
+      status: 'ACTIVE',
+      workoutPlanId: null,
+      dietPlanId: null,
+      calorieTarget: null,
+      proteinTarget: null,
+      carbTarget: null,
+      fatTarget: null,
+      stepTarget: null,
+      plannedWorkoutDays: null,
+      phaseNotes: '',
+      coachReason: ''
+    };
+  }
+
+  loadProgressPlanner(): void {
+    if (!this.member?.id || this.progressPlannerLoading) return;
+
+    this.progressPlannerLoading = true;
+    this.progressPlannerError = null;
+    this.progressPlannerApi.getOverview(this.member.id).subscribe({
+      next: (res) => {
+        this.progressPlanner = res;
+        this.currentPhase = res?.currentPhase || null;
+        this.phaseTimeline = res?.timeline || [];
+        this.progressPlannerLoading = false;
+      },
+      error: () => {
+        this.progressPlannerError = 'Unable to load progress planner.';
+        this.progressPlannerLoading = false;
+      }
+    });
+  }
+
+  startPhaseCreate(): void {
+    this.phaseFormMode = 'create';
+    this.editingPhaseId = null;
+    this.phaseForm = this.createEmptyPhaseForm();
+    this.phaseForm.goal = this.member?.mainTrainingGoal || this.member?.goal || '';
+    this.phaseForm.calorieTarget = this.bodyMetrics.targetCalories;
+    this.phaseForm.proteinTarget = this.bodyMetrics.proteinGrams;
+    this.phaseForm.carbTarget = this.bodyMetrics.carbsGrams;
+    this.phaseForm.fatTarget = this.bodyMetrics.fatsGrams;
+    this.phaseForm.stepTarget = this.activeWorkoutPlan?.targetStepsCount ?? null;
+    this.phaseForm.plannedWorkoutDays = this.member?.daysPerWeekTrain ?? null;
+    this.phaseForm.workoutPlanId = this.activeWorkoutPlan?.id || null;
+    this.phaseForm.dietPlanId = this.dietPlan?.id || null;
+    this.showPhaseForm = true;
+    this.phaseActionMessage = null;
+  }
+
+  startPhaseEdit(phase: any): void {
+    this.phaseFormMode = 'edit';
+    this.editingPhaseId = phase?.id || null;
+    this.phaseForm = {
+      phaseNumber: phase?.phaseNumber ?? null,
+      phaseName: phase?.phaseName || '',
+      goal: phase?.goal || '',
+      startDate: this.normalizeDateInput(phase?.startDate) || this.getTodayDateInput(),
+      plannedEndDate: this.normalizeDateInput(phase?.plannedEndDate) || '',
+      status: phase?.status || 'ACTIVE',
+      workoutPlanId: phase?.workoutPlanId || null,
+      dietPlanId: phase?.dietPlanId || null,
+      calorieTarget: this.toNumberOrNull(phase?.calorieTarget),
+      proteinTarget: this.toNumberOrNull(phase?.proteinTarget),
+      carbTarget: this.toNumberOrNull(phase?.carbTarget),
+      fatTarget: this.toNumberOrNull(phase?.fatTarget),
+      stepTarget: this.toNumberOrNull(phase?.stepTarget),
+      plannedWorkoutDays: this.toNumberOrNull(phase?.plannedWorkoutDays),
+      phaseNotes: phase?.phaseNotes || '',
+      coachReason: phase?.coachReason || ''
+    };
+    this.showPhaseForm = true;
+    this.phaseActionMessage = null;
+  }
+
+  savePhase(): void {
+    if (!this.member?.id || !this.phaseForm.phaseName.trim() || !this.phaseForm.startDate || !this.phaseForm.coachReason.trim()) {
+      this.phaseActionMessage = 'Phase name, start date, and coach reason are required.';
+      return;
+    }
+
+    this.phaseSaving = true;
+    this.phaseActionMessage = null;
+    const request = this.phaseFormMode === 'edit' && this.editingPhaseId
+      ? this.progressPlannerApi.updatePhase(this.member.id, this.editingPhaseId, this.phaseForm)
+      : this.progressPlannerApi.createPhase(this.member.id, this.phaseForm);
+
+    request.subscribe({
+      next: () => {
+        this.phaseSaving = false;
+        this.showPhaseForm = false;
+        this.phaseActionMessage = this.phaseFormMode === 'edit' ? 'Phase updated.' : 'Phase started.';
+        this.loadProgressPlanner();
+      },
+      error: () => {
+        this.phaseSaving = false;
+        this.phaseActionMessage = 'Unable to save phase.';
+      }
+    });
+  }
+
+  completeCurrentPhase(): void {
+    this.transitionCurrentPhase('complete');
+  }
+
+  pauseCurrentPhase(): void {
+    this.transitionCurrentPhase('pause');
+  }
+
+  private transitionCurrentPhase(action: 'complete' | 'pause'): void {
+    if (!this.member?.id || !this.currentPhase?.id) return;
+
+    const reason = window.prompt(`Reason to ${action} this phase?`);
+    if (!reason?.trim()) return;
+
+    this.phaseSaving = true;
+    const payload = {
+      actionDate: this.getTodayDateInput(),
+      reason: reason.trim(),
+      coachNotes: ''
+    };
+    const request = action === 'complete'
+      ? this.progressPlannerApi.completePhase(this.member.id, this.currentPhase.id, payload)
+      : this.progressPlannerApi.pausePhase(this.member.id, this.currentPhase.id, payload);
+
+    request.subscribe({
+      next: () => {
+        this.phaseSaving = false;
+        this.phaseActionMessage = action === 'complete' ? 'Phase completed.' : 'Phase paused.';
+        this.loadProgressPlanner();
+      },
+      error: () => {
+        this.phaseSaving = false;
+        this.phaseActionMessage = `Unable to ${action} phase.`;
+      }
+    });
+  }
+
+  getPhaseStatusClass(status: string | null | undefined): string {
+    return String(status || '').toLowerCase().replace(/_/g, '-');
+  }
+
+  formatPlannerChangeType(value: string | null | undefined): string {
+    return String(value || '').replace(/_/g, ' ').toLowerCase();
   }
 
   private applyBodyMetrics(source: any) {
@@ -935,7 +1107,8 @@ export class MemberProfileComponent implements OnInit {
     private dailyCheckinApi: DailyCheckinApiService,
     private progressCheckinApi: ProgressCheckinApiService,
     private photoApi : ProgressCheckinPhotoApiService,
-    private notificationApi: NotificationApiService
+    private notificationApi: NotificationApiService,
+    private progressPlannerApi: ProgressPlannerApiService
   ) {
 
     Chart.register(...registerables);
@@ -970,6 +1143,9 @@ removeMeasurement(index: number) {
   const memberId = this.route.snapshot.paramMap.get('memberId');
 
   if (memberId) {
+    if (this.route.snapshot.queryParamMap.get('tab') === 'progressPlanner') {
+      this.activeSection = 'progressPlanner';
+    }
     this.loadMember(memberId);
   } else {
     this.error = 'Invalid member id';
@@ -990,6 +1166,9 @@ removeMeasurement(index: number) {
       this.loadAllWorkoutPlans();
       this.loadDiet();
       this.loadProgressCheckins();
+      if (this.activeSection === 'progressPlanner') {
+        this.loadProgressPlanner();
+      }
     },
     error: () => {
       this.error = 'Failed to load member';

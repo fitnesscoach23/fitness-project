@@ -17,6 +17,7 @@ export class SidebarComponent {
     { label: 'Diet Plan', route: '/plans/diets/create', icon: 'P' },
     { label: 'Follow-Up Center', route: '/follow-up-center', icon: 'F' },
     { label: 'Check-In Center', route: '/check-in-center', icon: 'C' },
+    { label: 'Progress Planner', route: '/progress-planner', icon: 'R' },
     { label: 'Leaderboard', route: '/weekly-consistency-leaderboard', icon: '3' },
     { label: 'Billing', route: '/billing', icon: 'B' },
     { label: 'Notifications', route: '/notifications', icon: 'N' },

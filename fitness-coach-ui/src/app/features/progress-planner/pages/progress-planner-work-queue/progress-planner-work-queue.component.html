@@ -1,0 +1,90 @@
+<div class="planner-page">
+  <div class="planner-page-header">
+    <div>
+      <h1>Progress Planner</h1>
+      <p>Review members whose coaching phases are active, due, or overdue.</p>
+    </div>
+    <button type="button" class="secondary-action" (click)="loadQueue()">
+      Refresh
+    </button>
+  </div>
+
+  <div class="planner-filter-bar" role="group" aria-label="Progress planner filters">
+    <button
+      type="button"
+      *ngFor="let filter of filters"
+      [class.active]="activeFilter === filter.value"
+      (click)="activeFilter = filter.value">
+      {{ filter.label }}
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="queue-state">
+    Loading progress planner queue...
+  </div>
+
+  <div *ngIf="error && !loading" class="queue-state error">
+    {{ error }}
+  </div>
+
+  <div class="queue-panel" *ngIf="!loading && !error">
+    <div class="queue-count">
+      {{ filteredRows.length }} members
+    </div>
+
+    <div *ngIf="!filteredRows.length" class="queue-state">
+      No members match this filter yet.
+    </div>
+
+    <div class="queue-table-wrap" *ngIf="filteredRows.length">
+      <table class="queue-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Current Goal</th>
+            <th>Current Phase</th>
+            <th>Week</th>
+            <th>Consistency</th>
+            <th>Latest Check-In</th>
+            <th>Recommendation</th>
+            <th>Priority</th>
+            <th>Review Due</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of filteredRows; trackBy: trackByMember" [class.overdue-row]="row.overdue">
+            <td>
+              <strong>{{ row.memberName }}</strong>
+            </td>
+            <td>{{ row.currentGoal || '-' }}</td>
+            <td>{{ row.currentPhase || '-' }}</td>
+            <td>{{ row.weekInPhase }}</td>
+            <td>{{ row.latestConsistencyScore || '-' }}</td>
+            <td>{{ formatDate(row.latestCheckInDate) }}</td>
+            <td>{{ row.recommendationType }}</td>
+            <td>
+              <span class="priority-pill" [class.high]="row.priority === 'HIGH'">
+                {{ row.priority }}
+              </span>
+            </td>
+            <td>{{ formatDate(row.reviewDueDate) }}</td>
+            <td>
+              <span class="status-pill">{{ row.localStatus || row.status }}</span>
+            </td>
+            <td>
+              <div class="queue-actions">
+                <a [routerLink]="['/members', row.memberId]" [queryParams]="{ tab: 'progressPlanner' }">
+                  View
+                </a>
+                <button type="button" (click)="postpone(row)">Postpone</button>
+                <button type="button" (click)="markReviewed(row)">Reviewed</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

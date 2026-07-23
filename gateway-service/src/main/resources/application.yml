@@ -33,6 +33,11 @@ spring:
           predicates:
             - Path=/members/**
 
+        - id: progress-planner-service
+          uri: ${MEMBER_SERVICE_URL:http://member-service:8082}
+          predicates:
+            - Path=/progress-planner/**
+
         - id: diet-review-service
           uri: ${DIET_REVIEW_SERVICE_URL:http://diet-review:8088}
           predicates:

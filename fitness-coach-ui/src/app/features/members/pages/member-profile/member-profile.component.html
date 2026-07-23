@@ -128,6 +128,12 @@
     (click)="setSection('diet')">
     Diet
   </button>
+
+  <button
+    [class.active]="activeSection === 'progressPlanner'"
+    (click)="setSection('progressPlanner')">
+    Progress Planner
+  </button>
 </div>
 
 <!-- LOADING -->
@@ -1217,6 +1223,231 @@
       </app-daily-checkin-calendar>
     </div>
   </div>
+
+ <!-- ================= WORKOUT ================= -->
+<div *ngIf="activeSection === 'progressPlanner'" class="progress-planner-layout">
+  <div class="planner-header-row">
+    <div>
+      <h3 class="card-title">Progress Planner</h3>
+      <p>Manage coaching phases, review dates, and decision history for this member.</p>
+    </div>
+    <button type="button" class="primary-btn" (click)="startPhaseCreate()">
+      Start New Phase
+    </button>
+  </div>
+
+  <div *ngIf="progressPlannerLoading" class="state compact-state">
+    Loading progress planner...
+  </div>
+
+  <div *ngIf="progressPlannerError && !progressPlannerLoading" class="state error compact-state">
+    {{ progressPlannerError }}
+  </div>
+
+  <p *ngIf="phaseActionMessage" class="inline-status">
+    {{ phaseActionMessage }}
+  </p>
+
+  <div class="planner-grid" *ngIf="!progressPlannerLoading">
+    <div class="card current-phase-card">
+      <div class="planner-card-head">
+        <h4>Current Phase</h4>
+        <span
+          *ngIf="currentPhase"
+          class="phase-status"
+          [ngClass]="getPhaseStatusClass(currentPhase.status)">
+          {{ currentPhase.status }}
+        </span>
+      </div>
+
+      <ng-container *ngIf="currentPhase; else noCurrentPhase">
+        <div class="current-phase-title">
+          {{ currentPhase.phaseName }}
+        </div>
+        <div class="current-phase-goal">
+          {{ currentPhase.goal || member.mainTrainingGoal || member.goal || 'Goal not set' }}
+        </div>
+
+        <div class="planner-metric-grid">
+          <div>
+            <label>Current Week</label>
+            <strong>{{ currentPhase.currentWeek }}</strong>
+          </div>
+          <div>
+            <label>Start Date</label>
+            <strong>{{ formatProgressCheckinDate(currentPhase.startDate) }}</strong>
+          </div>
+          <div>
+            <label>Review Date</label>
+            <strong>{{ formatProgressCheckinDate(currentPhase.plannedEndDate) }}</strong>
+          </div>
+          <div>
+            <label>Calories</label>
+            <strong>{{ currentPhase.calorieTarget || '-' }}</strong>
+          </div>
+          <div>
+            <label>Macros</label>
+            <strong>
+              P {{ currentPhase.proteinTarget || '-' }} / C {{ currentPhase.carbTarget || '-' }} / F {{ currentPhase.fatTarget || '-' }}
+            </strong>
+          </div>
+          <div>
+            <label>Step Target</label>
+            <strong>{{ currentPhase.stepTarget || '-' }}</strong>
+          </div>
+          <div>
+            <label>Workout Days</label>
+            <strong>{{ currentPhase.plannedWorkoutDays || '-' }}</strong>
+          </div>
+          <div>
+            <label>Review Status</label>
+            <strong>{{ currentPhase.reviewOverdue ? 'Overdue' : 'On schedule' }}</strong>
+          </div>
+        </div>
+
+        <div class="phase-notes" *ngIf="currentPhase.phaseNotes">
+          {{ currentPhase.phaseNotes }}
+        </div>
+
+        <div class="planner-actions">
+          <button type="button" class="secondary-btn" (click)="startPhaseEdit(currentPhase)">
+            Edit Phase
+          </button>
+          <button type="button" class="secondary-btn" (click)="completeCurrentPhase()" [disabled]="phaseSaving">
+            Complete Phase
+          </button>
+          <button type="button" class="secondary-btn" (click)="pauseCurrentPhase()" [disabled]="phaseSaving">
+            Pause Phase
+          </button>
+        </div>
+      </ng-container>
+
+      <ng-template #noCurrentPhase>
+        <div class="planner-empty">
+          No active coaching phase yet.
+        </div>
+      </ng-template>
+    </div>
+
+    <div class="card recommendation-placeholder">
+      <div class="planner-card-head">
+        <h4>Recommendations</h4>
+        <span class="phase-status planned">Phase 2</span>
+      </div>
+      <div class="planner-empty">
+        Rule-based workout, diet, step, and recovery suggestions will appear here after Phase 2. Phase 1 never changes plans automatically.
+      </div>
+    </div>
+  </div>
+
+  <form *ngIf="showPhaseForm" class="card phase-form" (ngSubmit)="savePhase()">
+    <div class="planner-card-head">
+      <h4>{{ phaseFormMode === 'edit' ? 'Edit Phase' : 'Start New Phase' }}</h4>
+      <button type="button" class="secondary-btn" (click)="showPhaseForm = false">
+        Cancel
+      </button>
+    </div>
+
+    <div class="phase-form-grid">
+      <label>
+        Phase Name
+        <input type="text" name="phaseName" [(ngModel)]="phaseForm.phaseName" required />
+      </label>
+      <label>
+        Goal
+        <input type="text" name="goal" [(ngModel)]="phaseForm.goal" />
+      </label>
+      <label>
+        Start Date
+        <input type="date" name="startDate" [(ngModel)]="phaseForm.startDate" required />
+      </label>
+      <label>
+        Review Date
+        <input type="date" name="plannedEndDate" [(ngModel)]="phaseForm.plannedEndDate" />
+      </label>
+      <label>
+        Status
+        <select name="status" [(ngModel)]="phaseForm.status">
+          <option value="PLANNED">Planned</option>
+          <option value="ACTIVE">Active</option>
+          <option value="REVIEW_SOON">Review Soon</option>
+          <option value="CHANGE_RECOMMENDED">Change Recommended</option>
+          <option value="PAUSED">Paused</option>
+        </select>
+      </label>
+      <label>
+        Planned Workout Days
+        <input type="number" name="plannedWorkoutDays" [(ngModel)]="phaseForm.plannedWorkoutDays" />
+      </label>
+      <label>
+        Calories
+        <input type="number" name="calorieTarget" [(ngModel)]="phaseForm.calorieTarget" />
+      </label>
+      <label>
+        Protein
+        <input type="number" name="proteinTarget" [(ngModel)]="phaseForm.proteinTarget" />
+      </label>
+      <label>
+        Carbs
+        <input type="number" name="carbTarget" [(ngModel)]="phaseForm.carbTarget" />
+      </label>
+      <label>
+        Fats
+        <input type="number" name="fatTarget" [(ngModel)]="phaseForm.fatTarget" />
+      </label>
+      <label>
+        Step Target
+        <input type="number" name="stepTarget" [(ngModel)]="phaseForm.stepTarget" />
+      </label>
+    </div>
+
+    <label class="phase-textarea">
+      Phase Objective
+      <textarea rows="3" name="phaseNotes" [(ngModel)]="phaseForm.phaseNotes"></textarea>
+    </label>
+
+    <label class="phase-textarea">
+      Coach Reason
+      <textarea rows="3" name="coachReason" [(ngModel)]="phaseForm.coachReason" required></textarea>
+    </label>
+
+    <div class="planner-actions">
+      <button type="submit" class="primary-btn" [disabled]="phaseSaving">
+        {{ phaseSaving ? 'Saving...' : (phaseFormMode === 'edit' ? 'Save Phase' : 'Confirm and Activate') }}
+      </button>
+    </div>
+  </form>
+
+  <div class="card timeline-card">
+    <div class="planner-card-head">
+      <h4>Coaching Timeline</h4>
+      <span>{{ phaseTimeline.length }} changes</span>
+    </div>
+
+    <div *ngIf="!phaseTimeline.length" class="planner-empty">
+      Phase starts, completions, pauses, and coaching changes will appear here.
+    </div>
+
+    <div class="phase-timeline" *ngIf="phaseTimeline.length">
+      <div class="timeline-item" *ngFor="let item of phaseTimeline">
+        <div class="timeline-dot"></div>
+        <div>
+          <div class="timeline-title">
+            {{ formatPlannerChangeType(item.changeType) }}
+          </div>
+          <div class="timeline-meta">
+            {{ formatProgressCheckinDate(item.changeDate) }} · {{ item.source }}
+          </div>
+          <p>{{ item.reason }}</p>
+          <p *ngIf="item.previousValue || item.newValue" class="timeline-values">
+            {{ item.previousValue || '-' }} → {{ item.newValue || '-' }}
+          </p>
+          <p *ngIf="item.coachNotes" class="timeline-notes">{{ item.coachNotes }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
  <!-- ================= WORKOUT ================= -->
 <div *ngIf="activeSection === 'workout'" class="card">

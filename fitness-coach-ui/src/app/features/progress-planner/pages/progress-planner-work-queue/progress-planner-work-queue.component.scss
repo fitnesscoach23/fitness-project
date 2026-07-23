@@ -1,0 +1,148 @@
+.planner-page {
+  display: grid;
+  gap: 20px;
+}
+
+.planner-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.planner-page-header h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 28px;
+}
+
+.planner-page-header p {
+  margin: 6px 0 0;
+  color: #6b7280;
+}
+
+.secondary-action {
+  border: 0;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #111827;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.planner-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.planner-filter-bar button {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #374151;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.planner-filter-bar button.active {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.queue-panel {
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.queue-count,
+.queue-state {
+  padding: 16px 18px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.queue-state.error {
+  color: #b91c1c;
+}
+
+.queue-table-wrap {
+  overflow: auto;
+}
+
+.queue-table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+}
+
+.queue-table th,
+.queue-table td {
+  padding: 13px 14px;
+  border-top: 1px solid #eef2f7;
+  text-align: left;
+  font-size: 13px;
+}
+
+.queue-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.overdue-row {
+  background: #fffbeb;
+}
+
+.priority-pill,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.priority-pill.high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.queue-actions a,
+.queue-actions button {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+@media (max-width: 720px) {
+  .planner-page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

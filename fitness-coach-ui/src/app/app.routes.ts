@@ -40,6 +40,12 @@ export const routes: Routes = [
             import('./features/dashboard/pages/weekly-consistency-leaderboard/weekly-consistency-leaderboard.component')
             .then(m => m.WeeklyConsistencyLeaderboardComponent)
       },
+      {
+        path: 'progress-planner',
+        loadComponent: () =>
+            import('./features/progress-planner/pages/progress-planner-work-queue/progress-planner-work-queue.component')
+            .then(m => m.ProgressPlannerWorkQueueComponent)
+      },
       { path: 'members', component: MemberListComponent },
       {
         path: 'workoutplans',
