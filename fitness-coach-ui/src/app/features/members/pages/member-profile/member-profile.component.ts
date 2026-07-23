@@ -583,8 +583,23 @@ export class MemberProfileComponent implements OnInit {
   }
 
   savePhase(): void {
-    if (!this.member?.id || !this.phaseForm.phaseName.trim() || !this.phaseForm.startDate || !this.phaseForm.coachReason.trim()) {
-      this.phaseActionMessage = 'Phase name, start date, and coach reason are required.';
+    if (!this.member?.id) {
+      this.phaseActionMessage = 'Member is not loaded yet.';
+      return;
+    }
+
+    if (!this.phaseForm.phaseName.trim()) {
+      this.phaseActionMessage = 'Phase name is required.';
+      return;
+    }
+
+    if (!this.phaseForm.startDate) {
+      this.phaseActionMessage = 'Start date is required.';
+      return;
+    }
+
+    if (!this.phaseForm.coachReason.trim()) {
+      this.phaseActionMessage = 'Coach reason is required before activating a phase.';
       return;
     }
 

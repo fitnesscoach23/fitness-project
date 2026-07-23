@@ -1340,7 +1340,7 @@
     </div>
   </div>
 
-  <form *ngIf="showPhaseForm" class="card phase-form" (ngSubmit)="savePhase()">
+  <form *ngIf="showPhaseForm" class="card phase-form" novalidate (ngSubmit)="savePhase()">
     <div class="planner-card-head">
       <h4>{{ phaseFormMode === 'edit' ? 'Edit Phase' : 'Start New Phase' }}</h4>
       <button type="button" class="secondary-btn" (click)="showPhaseForm = false">
@@ -1410,6 +1410,10 @@
       Coach Reason
       <textarea rows="3" name="coachReason" [(ngModel)]="phaseForm.coachReason" required></textarea>
     </label>
+
+    <p *ngIf="phaseActionMessage" class="inline-status">
+      {{ phaseActionMessage }}
+    </p>
 
     <div class="planner-actions">
       <button type="submit" class="primary-btn" [disabled]="phaseSaving">
