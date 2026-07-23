@@ -62,6 +62,16 @@
         <em>Open Check-In Center</em>
       </a>
 
+      <a class="action-card recommended" routerLink="/progress-planner">
+        <span>Progress Planner</span>
+        <strong *ngIf="!progressPlannerLoading">{{ progressPlannerAttentionCount }}</strong>
+        <strong class="loading" *ngIf="progressPlannerLoading">...</strong>
+        <em>
+          {{ progressPlannerSummary.overduePhaseReviews }} overdue ·
+          {{ progressPlannerSummary.noChangeRequired }} no change
+        </em>
+      </a>
+
       <a class="action-card billing" routerLink="/billing">
         <span>Renewals Due</span>
         <strong *ngIf="!dueSoonLoading">{{ billingAttentionCount }}</strong>

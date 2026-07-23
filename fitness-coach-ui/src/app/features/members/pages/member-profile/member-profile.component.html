@@ -1226,8 +1226,9 @@
 
  <!-- ================= WORKOUT ================= -->
 <div *ngIf="activeSection === 'progressPlanner'" class="progress-planner-layout">
-  <div class="planner-header-row">
+  <div class="planner-header-row planner-hero">
     <div>
+      <div class="planner-eyebrow">Coaching Phase Control</div>
       <h3 class="card-title">Progress Planner</h3>
       <p>Manage coaching phases, review dates, and decision history for this member.</p>
     </div>
@@ -1249,9 +1250,12 @@
   </p>
 
   <div class="planner-grid" *ngIf="!progressPlannerLoading">
-    <div class="card current-phase-card">
+    <div class="card current-phase-card planner-panel">
       <div class="planner-card-head">
-        <h4>Current Phase</h4>
+        <div>
+          <span class="planner-card-kicker">Current Phase</span>
+          <h4>{{ currentPhase?.phaseName || 'No active phase' }}</h4>
+        </div>
         <span
           *ngIf="currentPhase"
           class="phase-status"
@@ -1261,9 +1265,6 @@
       </div>
 
       <ng-container *ngIf="currentPhase; else noCurrentPhase">
-        <div class="current-phase-title">
-          {{ currentPhase.phaseName }}
-        </div>
         <div class="current-phase-goal">
           {{ currentPhase.goal || member.mainTrainingGoal || member.goal || 'Goal not set' }}
         </div>
@@ -1306,6 +1307,7 @@
         </div>
 
         <div class="phase-notes" *ngIf="currentPhase.phaseNotes">
+          <span>Objective</span>
           {{ currentPhase.phaseNotes }}
         </div>
 
@@ -1329,18 +1331,67 @@
       </ng-template>
     </div>
 
-    <div class="card recommendation-placeholder">
+    <div class="card recommendation-placeholder planner-panel">
       <div class="planner-card-head">
-        <h4>Recommendations</h4>
-        <span class="phase-status planned">Phase 2</span>
+        <div>
+          <span class="planner-card-kicker">Explainable Suggestions</span>
+          <h4>Recommendations</h4>
+        </div>
+        <button
+          type="button"
+          class="secondary-btn"
+          [disabled]="generatingRecommendations || !currentPhase"
+          (click)="generatePhaseRecommendations()">
+          {{ generatingRecommendations ? 'Generating...' : 'Generate' }}
+        </button>
       </div>
-      <div class="planner-empty">
-        Rule-based workout, diet, step, and recovery suggestions will appear here after Phase 2. Phase 1 never changes plans automatically.
+
+      <div *ngIf="!phaseRecommendations.length" class="planner-empty">
+        No recommendations generated yet. Suggestions are advisory only and never update plans automatically.
+      </div>
+
+      <div *ngFor="let rec of phaseRecommendations" class="planner-recommendation-item">
+        <div class="planner-recommendation-head">
+          <div>
+            <strong>{{ rec.title }}</strong>
+            <div class="timeline-meta">
+              {{ rec.recommendationType }} · {{ rec.priority }} · {{ rec.status }}
+            </div>
+          </div>
+        </div>
+
+        <div class="planner-copy">
+          <strong>Suggested action:</strong> {{ rec.suggestedAction }}
+        </div>
+        <div class="planner-copy">
+          <strong>Reason:</strong> {{ rec.reason }}
+        </div>
+        <div class="planner-copy planner-supporting-data" *ngIf="rec.supportingMetrics">
+          <strong>Supporting data:</strong> {{ rec.supportingMetrics }}
+        </div>
+        <div class="planner-copy" *ngIf="rec.coachDecisionNotes">
+          <strong>Coach decision:</strong> {{ rec.coachDecisionNotes }}
+        </div>
+
+        <div class="planner-actions" *ngIf="isOpenRecommendation(rec)">
+          <button type="button" class="secondary-btn" (click)="acceptRecommendation(rec)">
+            Accept
+          </button>
+          <button type="button" class="secondary-btn" (click)="modifyRecommendation(rec)">
+            Modify
+          </button>
+          <button type="button" class="secondary-btn" (click)="rejectRecommendation(rec)">
+            Reject
+          </button>
+          <button type="button" class="secondary-btn" (click)="postponeRecommendation(rec)">
+            Postpone
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <form *ngIf="showPhaseForm" class="card phase-form" novalidate (ngSubmit)="savePhase()">
+  <form *ngIf="showPhaseForm" class="card phase-form planner-panel" novalidate (ngSubmit)="savePhase()">
     <div class="planner-card-head">
       <h4>{{ phaseFormMode === 'edit' ? 'Edit Phase' : 'Start New Phase' }}</h4>
       <button type="button" class="secondary-btn" (click)="showPhaseForm = false">
@@ -1422,10 +1473,13 @@
     </div>
   </form>
 
-  <div class="card timeline-card">
+  <div class="card timeline-card planner-panel">
     <div class="planner-card-head">
-      <h4>Coaching Timeline</h4>
-      <span>{{ phaseTimeline.length }} changes</span>
+      <div>
+        <span class="planner-card-kicker">History</span>
+        <h4>Coaching Timeline</h4>
+      </div>
+      <span class="phase-status planned">{{ phaseTimeline.length }} changes</span>
     </div>
 
     <div *ngIf="!phaseTimeline.length" class="planner-empty">

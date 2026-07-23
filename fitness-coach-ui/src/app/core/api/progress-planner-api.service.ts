@@ -35,6 +35,11 @@ export type PhaseLifecyclePayload = {
   coachNotes?: string | null;
 };
 
+export type RecommendationDecisionPayload = {
+  suggestedAction?: string | null;
+  coachDecisionNotes: string;
+};
+
 @Injectable({ providedIn: 'root' })
 export class ProgressPlannerApiService {
   constructor(private http: HttpClient) {}
@@ -61,5 +66,33 @@ export class ProgressPlannerApiService {
 
   getWorkQueue() {
     return this.http.get<any[]>(`${environment.memberApi}/members/progress-planner/work-queue`);
+  }
+
+  getRecommendations(memberId: string) {
+    return this.http.get<any[]>(`${environment.memberApi}/members/${memberId}/recommendations`);
+  }
+
+  generateRecommendations(memberId: string) {
+    return this.http.post<any[]>(`${environment.memberApi}/members/${memberId}/recommendations/generate`, {});
+  }
+
+  acceptRecommendation(recommendationId: string, payload: RecommendationDecisionPayload) {
+    return this.http.post<any>(`${environment.memberApi}/members/recommendations/${recommendationId}/accept`, payload);
+  }
+
+  modifyRecommendation(recommendationId: string, payload: RecommendationDecisionPayload) {
+    return this.http.post<any>(`${environment.memberApi}/members/recommendations/${recommendationId}/modify`, payload);
+  }
+
+  rejectRecommendation(recommendationId: string, payload: RecommendationDecisionPayload) {
+    return this.http.post<any>(`${environment.memberApi}/members/recommendations/${recommendationId}/reject`, payload);
+  }
+
+  postponeRecommendation(recommendationId: string, payload: RecommendationDecisionPayload) {
+    return this.http.post<any>(`${environment.memberApi}/members/recommendations/${recommendationId}/postpone`, payload);
+  }
+
+  getDashboardSummary() {
+    return this.http.get<any>(`${environment.memberApi}/members/dashboard/progress-planner-summary`);
   }
 }

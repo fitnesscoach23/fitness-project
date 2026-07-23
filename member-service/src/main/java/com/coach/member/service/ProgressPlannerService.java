@@ -5,6 +5,7 @@ import com.coach.member.entity.*;
 import com.coach.member.repository.CoachingPhaseRepository;
 import com.coach.member.repository.MemberRepository;
 import com.coach.member.repository.ProgressPlannerChangeRepository;
+import com.coach.member.repository.ProgressPlannerRecommendationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ public class ProgressPlannerService {
     private final MemberRepository memberRepository;
     private final CoachingPhaseRepository phaseRepository;
     private final ProgressPlannerChangeRepository changeRepository;
+    private final ProgressPlannerRecommendationRepository recommendationRepository;
+    private final ProgressRecommendationRuleService recommendationRuleService;
 
     @Transactional(readOnly = true)
     public ProgressPlannerOverviewResponse getOverview(String coachEmail, UUID memberId) {
@@ -49,8 +52,118 @@ public class ProgressPlannerService {
         return new ProgressPlannerOverviewResponse(
                 currentPhase,
                 phases,
-                getChangeHistory(coachEmail, memberId)
+                getChangeHistory(coachEmail, memberId),
+                getRecommendations(coachEmail, memberId)
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProgressPlannerRecommendationResponse> getRecommendations(String coachEmail, UUID memberId) {
+        requireMember(coachEmail, memberId);
+        return recommendationRepository.findByCoachEmailAndMemberIdOrderByGeneratedAtDesc(coachEmail, memberId)
+                .stream()
+                .map(this::toRecommendationResponse)
+                .toList();
+    }
+
+    @Transactional
+    public List<ProgressPlannerRecommendationResponse> generateRecommendations(String coachEmail, UUID memberId) {
+        Member member = requireMember(coachEmail, memberId);
+        CoachingPhase phase = phaseRepository
+                .findFirstByCoachEmailAndMemberIdAndStatusInOrderByStartDateDesc(coachEmail, memberId, CURRENT_STATUSES)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start an active phase before generating recommendations"));
+
+        List<ProgressRecommendationStatus> openStatuses = List.of(ProgressRecommendationStatus.NEW, ProgressRecommendationStatus.POSTPONED);
+        List<ProgressPlannerRecommendation> generated = recommendationRuleService.generate(member, phase)
+                .stream()
+                .filter(candidate -> recommendationRepository
+                        .findFirstByCoachEmailAndMemberIdAndPhaseIdAndRecommendationTypeAndStatusIn(
+                                coachEmail,
+                                memberId,
+                                phase.getId(),
+                                candidate.getRecommendationType(),
+                                openStatuses
+                        )
+                        .isEmpty()
+                )
+                .map(recommendationRepository::save)
+                .toList();
+
+        if (!generated.isEmpty() && phase.getStatus() == CoachingPhaseStatus.ACTIVE) {
+            phase.setStatus(CoachingPhaseStatus.CHANGE_RECOMMENDED);
+            phase.setUpdatedAt(Instant.now());
+            phaseRepository.save(phase);
+        }
+
+        return getRecommendations(coachEmail, memberId);
+    }
+
+    @Transactional
+    public ProgressPlannerRecommendationResponse acceptRecommendation(
+            String coachEmail,
+            UUID recommendationId,
+            RecommendationDecisionRequest request
+    ) {
+        ProgressPlannerRecommendation recommendation = requireRecommendation(coachEmail, recommendationId);
+        recommendation.setStatus(ProgressRecommendationStatus.ACCEPTED);
+        recommendation.setReviewedAt(Instant.now());
+        recommendation.setCoachDecisionNotes(request.coachDecisionNotes());
+        ProgressPlannerRecommendation saved = recommendationRepository.save(recommendation);
+
+        createChange(
+                coachEmail,
+                saved.getMemberId(),
+                saved.getPhaseId(),
+                parseChangeType(saved.getAcceptanceChangeType()),
+                LocalDate.now(),
+                null,
+                firstText(request.suggestedAction(), saved.getSuggestedAction()),
+                "Recommendation accepted: " + saved.getReason(),
+                request.coachDecisionNotes(),
+                ProgressPlannerChangeSource.RECOMMENDATION_ACCEPTED
+        );
+
+        return toRecommendationResponse(saved);
+    }
+
+    @Transactional
+    public ProgressPlannerRecommendationResponse modifyRecommendation(
+            String coachEmail,
+            UUID recommendationId,
+            RecommendationDecisionRequest request
+    ) {
+        ProgressPlannerRecommendation recommendation = requireRecommendation(coachEmail, recommendationId);
+        recommendation.setStatus(ProgressRecommendationStatus.MODIFIED);
+        recommendation.setSuggestedAction(firstText(request.suggestedAction(), recommendation.getSuggestedAction()));
+        recommendation.setReviewedAt(Instant.now());
+        recommendation.setCoachDecisionNotes(request.coachDecisionNotes());
+        return toRecommendationResponse(recommendationRepository.save(recommendation));
+    }
+
+    @Transactional
+    public ProgressPlannerRecommendationResponse rejectRecommendation(
+            String coachEmail,
+            UUID recommendationId,
+            RecommendationDecisionRequest request
+    ) {
+        ProgressPlannerRecommendation recommendation = requireRecommendation(coachEmail, recommendationId);
+        recommendation.setStatus(ProgressRecommendationStatus.REJECTED);
+        recommendation.setReviewedAt(Instant.now());
+        recommendation.setCoachDecisionNotes(request.coachDecisionNotes());
+        return toRecommendationResponse(recommendationRepository.save(recommendation));
+    }
+
+    @Transactional
+    public ProgressPlannerRecommendationResponse postponeRecommendation(
+            String coachEmail,
+            UUID recommendationId,
+            RecommendationDecisionRequest request
+    ) {
+        ProgressPlannerRecommendation recommendation = requireRecommendation(coachEmail, recommendationId);
+        recommendation.setStatus(ProgressRecommendationStatus.POSTPONED);
+        recommendation.setReviewedAt(Instant.now());
+        recommendation.setCoachDecisionNotes(request.coachDecisionNotes());
+        return toRecommendationResponse(recommendationRepository.save(recommendation));
     }
 
     @Transactional(readOnly = true)
@@ -149,6 +262,18 @@ public class ProgressPlannerService {
         LocalDate today = LocalDate.now();
         List<CoachingPhase> phases = phaseRepository
                 .findByCoachEmailAndStatusInOrderByPlannedEndDateAscStartDateAsc(coachEmail, CURRENT_STATUSES);
+        Map<UUID, ProgressPlannerRecommendation> recommendationsByPhase = recommendationRepository
+                .findByCoachEmailAndStatusInOrderByPriorityDescGeneratedAtDesc(
+                        coachEmail,
+                        List.of(ProgressRecommendationStatus.NEW, ProgressRecommendationStatus.POSTPONED)
+                )
+                .stream()
+                .filter(recommendation -> recommendation.getPhaseId() != null)
+                .collect(Collectors.toMap(
+                        ProgressPlannerRecommendation::getPhaseId,
+                        recommendation -> recommendation,
+                        (first, second) -> first
+                ));
         Map<UUID, Member> members = memberRepository.findAllById(
                         phases.stream().map(CoachingPhase::getMemberId).collect(Collectors.toSet())
                 )
@@ -160,6 +285,7 @@ public class ProgressPlannerService {
                 .filter(phase -> members.containsKey(phase.getMemberId()))
                 .map(phase -> {
                     Member member = members.get(phase.getMemberId());
+                    ProgressPlannerRecommendation recommendation = recommendationsByPhase.get(phase.getId());
                     return new ProgressPlannerWorkQueueRow(
                             member.getId(),
                             member.getFullName(),
@@ -169,14 +295,34 @@ public class ProgressPlannerService {
                             calculateCurrentWeek(phase),
                             "Not connected",
                             null,
-                            "Phase Review",
-                            isOverdue(phase, today) ? "HIGH" : "MEDIUM",
+                            recommendation == null ? "Phase Review" : getRecommendationTypeLabel(recommendation.getRecommendationType()),
+                            recommendation == null ? (isOverdue(phase, today) ? "HIGH" : "MEDIUM") : recommendation.getPriority().name(),
                             phase.getPlannedEndDate(),
                             phase.getStatus(),
                             isOverdue(phase, today)
                     );
                 })
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProgressPlannerDashboardSummaryResponse getDashboardSummary(String coachEmail) {
+        List<ProgressPlannerWorkQueueRow> rows = getWorkQueue(coachEmail);
+        List<ProgressPlannerRecommendation> recommendations = recommendationRepository
+                .findByCoachEmailAndStatusInOrderByPriorityDescGeneratedAtDesc(
+                        coachEmail,
+                        List.of(ProgressRecommendationStatus.NEW, ProgressRecommendationStatus.POSTPONED)
+                );
+
+        return new ProgressPlannerDashboardSummaryResponse(
+                rows.stream().filter(row -> "Phase Review".equals(row.recommendationType())).count(),
+                countType(recommendations, ProgressRecommendationType.WORKOUT),
+                countType(recommendations, ProgressRecommendationType.DIET),
+                countType(recommendations, ProgressRecommendationType.STEPS),
+                countType(recommendations, ProgressRecommendationType.RECOVERY),
+                countType(recommendations, ProgressRecommendationType.NO_CHANGE),
+                rows.stream().filter(ProgressPlannerWorkQueueRow::overdue).count()
+        );
     }
 
     private CoachingPhaseResponse transitionPhase(
@@ -273,6 +419,12 @@ public class ProgressPlannerService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Coaching phase not found"));
     }
 
+    private ProgressPlannerRecommendation requireRecommendation(String coachEmail, UUID recommendationId) {
+        return recommendationRepository.findById(recommendationId)
+                .filter(recommendation -> coachEmail.equals(recommendation.getCoachEmail()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recommendation not found"));
+    }
+
     private CoachingPhaseResponse toPhaseResponse(CoachingPhase phase) {
         LocalDate today = LocalDate.now();
         return new CoachingPhaseResponse(
@@ -320,6 +472,24 @@ public class ProgressPlannerService {
         );
     }
 
+    private ProgressPlannerRecommendationResponse toRecommendationResponse(ProgressPlannerRecommendation recommendation) {
+        return new ProgressPlannerRecommendationResponse(
+                recommendation.getId(),
+                recommendation.getMemberId(),
+                recommendation.getPhaseId(),
+                recommendation.getRecommendationType(),
+                recommendation.getTitle(),
+                recommendation.getSuggestedAction(),
+                recommendation.getReason(),
+                recommendation.getSupportingMetrics(),
+                recommendation.getPriority(),
+                recommendation.getStatus(),
+                recommendation.getGeneratedAt(),
+                recommendation.getReviewedAt(),
+                recommendation.getCoachDecisionNotes()
+        );
+    }
+
     private long calculateCurrentWeek(CoachingPhase phase) {
         return Math.max(1, (ChronoUnit.DAYS.between(phase.getStartDate(), LocalDate.now()) / 7) + 1);
     }
@@ -348,5 +518,25 @@ public class ProgressPlannerService {
             }
         }
         return "-";
+    }
+
+    private ProgressPlannerChangeType parseChangeType(String value) {
+        try {
+            return ProgressPlannerChangeType.valueOf(firstText(value, "OTHER"));
+        } catch (IllegalArgumentException ex) {
+            return ProgressPlannerChangeType.OTHER;
+        }
+    }
+
+    private String getRecommendationTypeLabel(ProgressRecommendationType type) {
+        if (type == ProgressRecommendationType.NO_CHANGE) return "No Change Required";
+        if (type == ProgressRecommendationType.PHASE_REVIEW) return "Phase Review";
+        return type.name().charAt(0) + type.name().substring(1).toLowerCase();
+    }
+
+    private long countType(List<ProgressPlannerRecommendation> recommendations, ProgressRecommendationType type) {
+        return recommendations.stream()
+                .filter(recommendation -> recommendation.getRecommendationType() == type)
+                .count();
     }
 }

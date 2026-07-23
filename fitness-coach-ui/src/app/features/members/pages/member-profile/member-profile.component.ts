@@ -185,6 +185,8 @@ export class MemberProfileComponent implements OnInit {
   progressPlanner: any = null;
   currentPhase: any = null;
   phaseTimeline: any[] = [];
+  phaseRecommendations: any[] = [];
+  generatingRecommendations = false;
   phaseSaving = false;
   phaseActionMessage: string | null = null;
   showPhaseForm = false;
@@ -531,6 +533,7 @@ export class MemberProfileComponent implements OnInit {
         this.progressPlanner = res;
         this.currentPhase = res?.currentPhase || null;
         this.phaseTimeline = res?.timeline || [];
+        this.phaseRecommendations = res?.recommendations || [];
         this.progressPlannerLoading = false;
       },
       error: () => {
@@ -666,6 +669,93 @@ export class MemberProfileComponent implements OnInit {
 
   formatPlannerChangeType(value: string | null | undefined): string {
     return String(value || '').replace(/_/g, ' ').toLowerCase();
+  }
+
+  generatePhaseRecommendations(): void {
+    if (!this.member?.id || this.generatingRecommendations) return;
+
+    this.generatingRecommendations = true;
+    this.phaseActionMessage = null;
+    this.progressPlannerApi.generateRecommendations(this.member.id).subscribe({
+      next: (res) => {
+        this.phaseRecommendations = res || [];
+        this.generatingRecommendations = false;
+        this.phaseActionMessage = 'Recommendations generated.';
+        this.loadProgressPlanner();
+      },
+      error: () => {
+        this.generatingRecommendations = false;
+        this.phaseActionMessage = 'Start an active phase before generating recommendations.';
+      }
+    });
+  }
+
+  acceptRecommendation(recommendation: any): void {
+    const notes = window.prompt('Coach decision notes for accepting this recommendation?');
+    if (!notes?.trim()) return;
+
+    this.progressPlannerApi.acceptRecommendation(recommendation.id, {
+      suggestedAction: recommendation.suggestedAction,
+      coachDecisionNotes: notes.trim()
+    }).subscribe({
+      next: () => {
+        this.phaseActionMessage = 'Recommendation accepted and logged in change history.';
+        this.loadProgressPlanner();
+      },
+      error: () => this.phaseActionMessage = 'Unable to accept recommendation.'
+    });
+  }
+
+  modifyRecommendation(recommendation: any): void {
+    const suggestedAction = window.prompt('Modified suggested action:', recommendation.suggestedAction || '');
+    if (!suggestedAction?.trim()) return;
+    const notes = window.prompt('Coach notes for this modification?');
+    if (!notes?.trim()) return;
+
+    this.progressPlannerApi.modifyRecommendation(recommendation.id, {
+      suggestedAction: suggestedAction.trim(),
+      coachDecisionNotes: notes.trim()
+    }).subscribe({
+      next: () => {
+        this.phaseActionMessage = 'Recommendation marked as modified.';
+        this.loadProgressPlanner();
+      },
+      error: () => this.phaseActionMessage = 'Unable to modify recommendation.'
+    });
+  }
+
+  rejectRecommendation(recommendation: any): void {
+    const notes = window.prompt('Reason for rejecting this recommendation?');
+    if (!notes?.trim()) return;
+
+    this.progressPlannerApi.rejectRecommendation(recommendation.id, {
+      coachDecisionNotes: notes.trim()
+    }).subscribe({
+      next: () => {
+        this.phaseActionMessage = 'Recommendation rejected.';
+        this.loadProgressPlanner();
+      },
+      error: () => this.phaseActionMessage = 'Unable to reject recommendation.'
+    });
+  }
+
+  postponeRecommendation(recommendation: any): void {
+    const notes = window.prompt('Postpone notes / next review context?');
+    if (!notes?.trim()) return;
+
+    this.progressPlannerApi.postponeRecommendation(recommendation.id, {
+      coachDecisionNotes: notes.trim()
+    }).subscribe({
+      next: () => {
+        this.phaseActionMessage = 'Recommendation postponed.';
+        this.loadProgressPlanner();
+      },
+      error: () => this.phaseActionMessage = 'Unable to postpone recommendation.'
+    });
+  }
+
+  isOpenRecommendation(recommendation: any): boolean {
+    return recommendation?.status === 'NEW' || recommendation?.status === 'POSTPONED';
   }
 
   private applyBodyMetrics(source: any) {

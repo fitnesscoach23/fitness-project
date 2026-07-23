@@ -9,6 +9,7 @@ import { WorkoutApiService } from '../../../../core/services/workout-api.service
 import { DietApiService } from '../../../../core/services/diet-api.service';
 import { ProgressCheckinApiService } from '../../../../core/services/progress-checkin-api.service';
 import { NotificationApiService } from '../../../../core/api/notification-api.service';
+import { ProgressPlannerApiService } from '../../../../core/api/progress-planner-api.service';
 import { environment } from '../../../../../environments/environment';
 import { DailyCheckinApiService, DailyCheckinDay } from '../../../../core/services/daily-checkin-api.service';
 
@@ -97,6 +98,7 @@ export class DashboardComponent implements OnInit {
 
   private readonly dueSoonDays = 7;
   private readonly router = inject(Router);
+  private readonly progressPlannerApi = inject(ProgressPlannerApiService);
 
   totalMembers = 0;
   loading = true;
@@ -133,6 +135,16 @@ export class DashboardComponent implements OnInit {
     followUpRecommended: 0,
     reEngagementNeeded: 0
   };
+  progressPlannerLoading = true;
+  progressPlannerSummary: any = {
+    membersDueForPhaseReview: 0,
+    workoutChangeRecommended: 0,
+    dietAdjustmentRecommended: 0,
+    stepChangeRecommended: 0,
+    deloadRecoveryReviewRequired: 0,
+    noChangeRequired: 0,
+    overduePhaseReviews: 0
+  };
 
   constructor(
     private memberApi: MemberApiService,
@@ -146,6 +158,7 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() {
     this.loadStats();
+    this.loadProgressPlannerSummary();
   }
 
   loadStats() {
@@ -177,6 +190,27 @@ export class DashboardComponent implements OnInit {
         this.followUpLoading = false;
       }
     });
+  }
+
+  loadProgressPlannerSummary(): void {
+    this.progressPlannerLoading = true;
+    this.progressPlannerApi.getDashboardSummary().subscribe({
+      next: (summary) => {
+        this.progressPlannerSummary = summary || this.progressPlannerSummary;
+        this.progressPlannerLoading = false;
+      },
+      error: () => {
+        this.progressPlannerLoading = false;
+      }
+    });
+  }
+
+  get progressPlannerAttentionCount(): number {
+    return Number(this.progressPlannerSummary.membersDueForPhaseReview || 0)
+      + Number(this.progressPlannerSummary.workoutChangeRecommended || 0)
+      + Number(this.progressPlannerSummary.dietAdjustmentRecommended || 0)
+      + Number(this.progressPlannerSummary.stepChangeRecommended || 0)
+      + Number(this.progressPlannerSummary.deloadRecoveryReviewRequired || 0);
   }
 
   formatCurrency(value: number): string {

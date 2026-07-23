@@ -68,6 +68,16 @@ public class ProgressPlannerController {
         return ResponseEntity.ok(service.getChangeHistory(current.getCoachEmail(), memberId));
     }
 
+    @GetMapping("/members/{memberId}/recommendations")
+    public ResponseEntity<List<ProgressPlannerRecommendationResponse>> recommendations(@PathVariable UUID memberId) {
+        return ResponseEntity.ok(service.getRecommendations(current.getCoachEmail(), memberId));
+    }
+
+    @PostMapping("/members/{memberId}/recommendations/generate")
+    public ResponseEntity<List<ProgressPlannerRecommendationResponse>> generateRecommendations(@PathVariable UUID memberId) {
+        return ResponseEntity.ok(service.generateRecommendations(current.getCoachEmail(), memberId));
+    }
+
     @PostMapping("/members/{memberId}/change-history")
     public ResponseEntity<ProgressPlannerChangeResponse> addChange(
             @PathVariable UUID memberId,
@@ -84,5 +94,79 @@ public class ProgressPlannerController {
     @GetMapping("/members/progress-planner/work-queue")
     public ResponseEntity<List<ProgressPlannerWorkQueueRow>> memberRoutedWorkQueue() {
         return workQueue();
+    }
+
+    @GetMapping("/members/dashboard/progress-planner-summary")
+    public ResponseEntity<ProgressPlannerDashboardSummaryResponse> memberRoutedDashboardSummary() {
+        return ResponseEntity.ok(service.getDashboardSummary(current.getCoachEmail()));
+    }
+
+    @GetMapping("/dashboard/progress-planner-summary")
+    public ResponseEntity<ProgressPlannerDashboardSummaryResponse> dashboardSummary() {
+        return memberRoutedDashboardSummary();
+    }
+
+    @PostMapping("/recommendations/{id}/accept")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> acceptRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return ResponseEntity.ok(service.acceptRecommendation(current.getCoachEmail(), id, request));
+    }
+
+    @PostMapping("/recommendations/{id}/modify")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> modifyRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return ResponseEntity.ok(service.modifyRecommendation(current.getCoachEmail(), id, request));
+    }
+
+    @PostMapping("/recommendations/{id}/reject")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> rejectRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return ResponseEntity.ok(service.rejectRecommendation(current.getCoachEmail(), id, request));
+    }
+
+    @PostMapping("/recommendations/{id}/postpone")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> postponeRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return ResponseEntity.ok(service.postponeRecommendation(current.getCoachEmail(), id, request));
+    }
+
+    @PostMapping("/members/recommendations/{id}/accept")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> memberRoutedAcceptRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return acceptRecommendation(id, request);
+    }
+
+    @PostMapping("/members/recommendations/{id}/modify")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> memberRoutedModifyRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return modifyRecommendation(id, request);
+    }
+
+    @PostMapping("/members/recommendations/{id}/reject")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> memberRoutedRejectRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return rejectRecommendation(id, request);
+    }
+
+    @PostMapping("/members/recommendations/{id}/postpone")
+    public ResponseEntity<ProgressPlannerRecommendationResponse> memberRoutedPostponeRecommendation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RecommendationDecisionRequest request
+    ) {
+        return postponeRecommendation(id, request);
     }
 }
