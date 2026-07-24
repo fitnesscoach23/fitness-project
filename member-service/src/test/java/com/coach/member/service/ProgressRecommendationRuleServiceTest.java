@@ -80,4 +80,40 @@ class ProgressRecommendationRuleServiceTest {
                         assertThat(recommendation.getRecommendationType()).isEqualTo(ProgressRecommendationType.NO_CHANGE)
                 );
     }
+
+    @Test
+    void generatesRecoveryReviewForMultipleWarningSigns() {
+        Member member = Member.builder()
+                .id(UUID.randomUUID())
+                .coachEmail("coach@example.com")
+                .fullName("Test Member")
+                .mainTrainingGoal("Lean gain")
+                .injuries("Shoulder pain during pressing")
+                .stressLevel(9)
+                .sleepHours("5")
+                .build();
+        CoachingPhase phase = CoachingPhase.builder()
+                .id(UUID.randomUUID())
+                .memberId(member.getId())
+                .coachEmail(member.getCoachEmail())
+                .phaseName("Lean Gain Phase 1")
+                .goal("Lean gain")
+                .startDate(LocalDate.now().minusWeeks(9))
+                .plannedEndDate(LocalDate.now().plusWeeks(1))
+                .status(CoachingPhaseStatus.ACTIVE)
+                .calorieTarget(2600)
+                .proteinTarget(new java.math.BigDecimal("150"))
+                .stepTarget(7000)
+                .plannedWorkoutDays(6)
+                .build();
+
+        var recommendations = service.generate(member, phase);
+
+        assertThat(recommendations)
+                .anySatisfy(recommendation -> {
+                    assertThat(recommendation.getRecommendationType()).isEqualTo(ProgressRecommendationType.RECOVERY);
+                    assertThat(recommendation.getSuggestedAction()).containsIgnoringCase("deload");
+                    assertThat(recommendation.getReason()).containsIgnoringCase("not a diagnosis");
+                });
+    }
 }

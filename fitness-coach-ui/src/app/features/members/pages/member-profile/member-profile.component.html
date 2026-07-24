@@ -1391,6 +1391,27 @@
     </div>
   </div>
 
+  <div class="card planner-panel planner-trends-panel" *ngIf="!progressPlannerLoading">
+    <div class="planner-card-head">
+      <div>
+        <span class="planner-card-kicker">Compact Signals</span>
+        <h4>Planner Trends</h4>
+      </div>
+      <span class="phase-status planned">Existing data</span>
+    </div>
+
+    <div class="planner-trend-grid">
+      <div
+        class="planner-trend-card"
+        *ngFor="let trend of getProgressPlannerTrendCards()"
+        [ngClass]="getPlannerTrendClass(trend.tone)">
+        <span>{{ trend.label }}</span>
+        <strong>{{ trend.value }}</strong>
+        <em>{{ trend.meta }}</em>
+      </div>
+    </div>
+  </div>
+
   <form *ngIf="showPhaseForm" class="card phase-form planner-panel" novalidate (ngSubmit)="savePhase()">
     <div class="planner-card-head">
       <h4>{{ phaseFormMode === 'edit' ? 'Edit Phase' : 'Start New Phase' }}</h4>

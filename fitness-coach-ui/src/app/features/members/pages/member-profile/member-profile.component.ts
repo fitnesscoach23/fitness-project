@@ -671,6 +671,85 @@ export class MemberProfileComponent implements OnInit {
     return String(value || '').replace(/_/g, ' ').toLowerCase();
   }
 
+  getProgressPlannerTrendCards(): { label: string; value: string; meta: string; tone: string }[] {
+    const sorted = this.getSortedProgressCheckins();
+    const latest = sorted[0] || null;
+    const previous = sorted[1] || null;
+    const latestWeight = this.toNumberOrNull(latest?.weight);
+    const previousWeight = this.toNumberOrNull(previous?.weight);
+    const latestSteps = this.toNumberOrNull(latest?.stepsAvg);
+    const previousSteps = this.toNumberOrNull(previous?.stepsAvg);
+    const latestExerciseRating = this.toNumberOrNull(latest?.exerciseRating ?? latest?.energy);
+    const previousExerciseRating = this.toNumberOrNull(previous?.exerciseRating ?? previous?.energy);
+    const latestDietAdherence = this.toNumberOrNull(latest?.dietAdherence);
+
+    return [
+      {
+        label: 'Weight Trend',
+        value: latestWeight == null ? '-' : `${latestWeight} kg`,
+        meta: this.formatTrendDelta(latestWeight, previousWeight, ' kg', true),
+        tone: this.getTrendTone(latestWeight, previousWeight, true)
+      },
+      {
+        label: 'Workout Compliance',
+        value: this.currentWeekConsistency ? `${Math.round(this.currentWeekConsistency.workoutCompliance)}%` : '-',
+        meta: this.previousWeekConsistency ? `Previous ${Math.round(this.previousWeekConsistency.workoutCompliance)}%` : 'Needs weekly data',
+        tone: this.getTrendTone(this.currentWeekConsistency?.workoutCompliance, this.previousWeekConsistency?.workoutCompliance)
+      },
+      {
+        label: 'Steps Compliance',
+        value: this.currentWeekConsistency ? `${Math.round(this.currentWeekConsistency.stepsCompliance)}%` : '-',
+        meta: latestSteps == null ? 'No step check-in yet' : `Latest avg ${Math.round(latestSteps)} steps`,
+        tone: this.getTrendTone(latestSteps, previousSteps)
+      },
+      {
+        label: 'Diet Adherence',
+        value: latestDietAdherence == null ? '-' : `${latestDietAdherence}/10`,
+        meta: this.avgDietAdherence ? `Average ${this.avgDietAdherence.toFixed(1)}/10` : 'Needs check-ins',
+        tone: latestDietAdherence == null ? 'neutral' : latestDietAdherence >= 8 ? 'positive' : latestDietAdherence >= 6 ? 'neutral' : 'negative'
+      },
+      {
+        label: 'Exercise Rating',
+        value: latestExerciseRating == null ? '-' : `${latestExerciseRating}/10`,
+        meta: this.formatTrendDelta(latestExerciseRating, previousExerciseRating, '/10'),
+        tone: this.getTrendTone(latestExerciseRating, previousExerciseRating)
+      },
+      {
+        label: 'Calories / Steps',
+        value: `${this.currentPhase?.calorieTarget || '-'} cal`,
+        meta: `${this.currentPhase?.stepTarget || '-'} step target`,
+        tone: 'neutral'
+      }
+    ];
+  }
+
+  private getSortedProgressCheckins(): any[] {
+    return [...(this.progressCheckins || [])].sort(
+      (a, b) => this.getCheckinDateValue(b.submittedAt) - this.getCheckinDateValue(a.submittedAt)
+    );
+  }
+
+  private formatTrendDelta(current: number | null | undefined, previous: number | null | undefined, suffix = '', preferDecrease = false): string {
+    if (current == null || previous == null) return 'Needs comparison data';
+    const delta = this.roundToTwo(current - previous);
+    if (delta === 0) return 'No change from previous';
+    const prefix = delta > 0 ? '+' : '';
+    const direction = this.getTrendTone(current, previous, preferDecrease) === 'positive' ? 'improving' : 'declining';
+    return `${prefix}${delta}${suffix} from previous, ${direction}`;
+  }
+
+  getPlannerTrendClass(tone: string): string {
+    if (tone === 'positive') return 'positive';
+    if (tone === 'negative') return 'negative';
+    return 'neutral';
+  }
+
+  private getTrendTone(current: number | null | undefined, previous: number | null | undefined, preferDecrease = false): string {
+    if (current == null || previous == null || current === previous) return 'neutral';
+    const improved = preferDecrease ? current < previous : current > previous;
+    return improved ? 'positive' : 'negative';
+  }
+
   generatePhaseRecommendations(): void {
     if (!this.member?.id || this.generatingRecommendations) return;
 

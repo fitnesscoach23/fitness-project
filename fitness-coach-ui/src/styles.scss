@@ -454,6 +454,58 @@ select option:disabled {
   padding: 10px;
 }
 
+.planner-trends-panel {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.planner-trend-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.planner-trend-card {
+  border: 1px solid #e5eaf1;
+  border-top: 3px solid #94a3b8;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 13px 14px;
+}
+
+.planner-trend-card.positive {
+  border-top-color: #16a34a;
+}
+
+.planner-trend-card.negative {
+  border-top-color: #dc2626;
+}
+
+.planner-trend-card span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.planner-trend-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: 19px;
+}
+
+.planner-trend-card em {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.35;
+}
+
 .phase-form {
   display: grid;
   gap: 14px;
@@ -509,7 +561,8 @@ select option:disabled {
 @media (max-width: 980px) {
   .planner-grid,
   .planner-metric-grid,
-  .phase-form-grid {
+  .phase-form-grid,
+  .planner-trend-grid {
     grid-template-columns: 1fr;
   }
 }
