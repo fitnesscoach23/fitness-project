@@ -776,12 +776,18 @@
               <div class="comparison-label">Previous Steps</div>
               <div class="comparison-value">{{ getComparisonValue(previousCheckin, 'stepsAvg') }}</div>
 
+              <div class="comparison-label">Current Diet Rating</div>
+              <div class="comparison-value">{{ getComparisonValue(currentCheckin, 'dietAdherence') }}/10</div>
+
+              <div class="comparison-label">Previous Diet Rating</div>
+              <div class="comparison-value">{{ getComparisonValue(previousCheckin, 'dietAdherence') }}/10</div>
+
               <div class="comparison-label accent">Current Diet Plan</div>
               <div class="comparison-value wide">{{ currentDietPlanSummary }}</div>
 
               <div class="comparison-label accent">Last Changes</div>
               <div class="comparison-value wide">
-                Weight {{ getComparisonDelta('weight') }} · Steps {{ getComparisonDelta('stepsAvg') }}
+                Weight {{ getComparisonDelta('weight') }} · Steps {{ getComparisonDelta('stepsAvg') }} · Diet {{ getComparisonDelta('dietAdherence') }}
               </div>
 
               <div class="comparison-label accent">Exercise Rating</div>
