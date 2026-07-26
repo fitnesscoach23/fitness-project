@@ -277,14 +277,46 @@
       <table *ngIf="!billingRowsLoading && billingRows.length" class="data-table">
         <thead>
           <tr>
-            <th>Member</th>
-            <th>Plan</th>
-            <th>Status</th>
-            <th>Member</th>
-            <th>Renewal Date</th>
-            <th>Days Left</th>
-            <th>Pending</th>
-            <th>Total Paid</th>
+            <th [attr.aria-sort]="getBillingSortAria('fullName')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('fullName')">
+                Member <span>{{ getBillingSortIcon('fullName') }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="getBillingSortAria('planName')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('planName')">
+                Plan <span>{{ getBillingSortIcon('planName') }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="getBillingSortAria('status')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('status')">
+                Status <span>{{ getBillingSortIcon('status') }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="getBillingSortAria('memberStatus')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('memberStatus')">
+                Member <span>{{ getBillingSortIcon('memberStatus') }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="getBillingSortAria('renewalDate')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('renewalDate')">
+                Renewal Date <span>{{ getBillingSortIcon('renewalDate') }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="getBillingSortAria('daysLeft')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('daysLeft')">
+                Days Left <span>{{ getBillingSortIcon('daysLeft') }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="getBillingSortAria('totalPending')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('totalPending')">
+                Pending <span>{{ getBillingSortIcon('totalPending') }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="getBillingSortAria('totalPaid')">
+              <button type="button" class="sort-header" (click)="sortBillingRows('totalPaid')">
+                Total Paid <span>{{ getBillingSortIcon('totalPaid') }}</span>
+              </button>
+            </th>
             <th></th>
           </tr>
         </thead>

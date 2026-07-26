@@ -26,6 +26,18 @@ type BillingRow = {
   amountSource: string;
 };
 
+type BillingSortKey =
+  | 'fullName'
+  | 'planName'
+  | 'status'
+  | 'memberStatus'
+  | 'renewalDate'
+  | 'daysLeft'
+  | 'totalPending'
+  | 'totalPaid';
+
+type SortDirection = 'asc' | 'desc';
+
 @Component({
   selector: 'app-billing-home',
   standalone: true,
@@ -46,6 +58,8 @@ export class BillingHomeComponent implements OnInit {
 
   billingRows: BillingRow[] = [];
   billingRowsLoading = true;
+  billingSortKey: BillingSortKey = 'totalPending';
+  billingSortDirection: SortDirection = 'desc';
 
   subscription: any = null;
   subscriptionHistory: any[] = [];
@@ -236,7 +250,7 @@ export class BillingHomeComponent implements OnInit {
 
     forkJoin(requests).subscribe({
       next: (rows) => {
-        this.billingRows = rows.sort((a, b) => b.totalPending - a.totalPending);
+        this.billingRows = this.getSortedBillingRows(rows);
         this.autoMarkOverdueMembersInactive(this.billingRows);
         this.billingRowsLoading = false;
       },
@@ -701,6 +715,85 @@ export class BillingHomeComponent implements OnInit {
     return `${days} day(s) left`;
   }
 
+  sortBillingRows(key: BillingSortKey): void {
+    if (this.billingSortKey === key) {
+      this.billingSortDirection = this.billingSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.billingSortKey = key;
+      this.billingSortDirection = this.getDefaultBillingSortDirection(key);
+    }
+
+    this.billingRows = this.getSortedBillingRows(this.billingRows);
+  }
+
+  getBillingSortIcon(key: BillingSortKey): string {
+    if (this.billingSortKey !== key) return '↕';
+    return this.billingSortDirection === 'asc' ? '↑' : '↓';
+  }
+
+  getBillingSortAria(key: BillingSortKey): string {
+    if (this.billingSortKey !== key) return 'none';
+    return this.billingSortDirection === 'asc' ? 'ascending' : 'descending';
+  }
+
+  private getSortedBillingRows(rows: BillingRow[]): BillingRow[] {
+    const direction = this.billingSortDirection === 'asc' ? 1 : -1;
+
+    return [...rows].sort((a, b) => {
+      const compared = this.compareBillingRows(a, b, this.billingSortKey, direction);
+      if (compared !== 0) return compared * direction;
+      return a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' });
+    });
+  }
+
+  private compareBillingRows(a: BillingRow, b: BillingRow, key: BillingSortKey, direction: number): number {
+    switch (key) {
+      case 'fullName':
+        return this.compareText(a.fullName, b.fullName);
+      case 'planName':
+        return this.compareText(a.planName, b.planName);
+      case 'status':
+        return this.compareText(a.status, b.status);
+      case 'memberStatus':
+        return this.compareText(a.memberStatus, b.memberStatus);
+      case 'renewalDate':
+        return this.compareNullableNumbers(this.getDateSortValue(a.renewalDate), this.getDateSortValue(b.renewalDate), direction);
+      case 'daysLeft':
+        return this.compareNullableNumbers(this.getDaysRemaining(a.renewalDate), this.getDaysRemaining(b.renewalDate), direction);
+      case 'totalPending':
+        return this.compareNumbers(a.totalPending, b.totalPending);
+      case 'totalPaid':
+        return this.compareNumbers(a.totalPaid, b.totalPaid);
+      default:
+        return 0;
+    }
+  }
+
+  private getDefaultBillingSortDirection(key: BillingSortKey): SortDirection {
+    return key === 'totalPending' || key === 'totalPaid' ? 'desc' : 'asc';
+  }
+
+  private compareText(a: string, b: string): number {
+    return (a || '').localeCompare(b || '', undefined, { sensitivity: 'base' });
+  }
+
+  private compareNumbers(a: number, b: number): number {
+    return (a || 0) - (b || 0);
+  }
+
+  private compareNullableNumbers(a: number | null, b: number | null, direction: number): number {
+    if (a == null && b == null) return 0;
+    if (a == null) return direction;
+    if (b == null) return -direction;
+    return a - b;
+  }
+
+  private getDateSortValue(value: string): number | null {
+    if (!value || value === '-') return null;
+    const parsed = new Date(`${value.slice(0, 10)}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+  }
+
   isExpiringSoon(renewalDate: string): boolean {
     const days = this.getDaysRemaining(renewalDate);
     return days != null && days >= 0 && days <= this.expirySoonDays;
@@ -771,6 +864,7 @@ export class BillingHomeComponent implements OnInit {
     this.billingRows = this.billingRows.map((row) =>
       row.id === memberId ? { ...row, memberStatus: status } : row
     );
+    this.billingRows = this.getSortedBillingRows(this.billingRows);
     if (this.selectedMemberId === memberId && this.selectedMember) {
       this.selectedMember = { ...this.selectedMember, status };
     }

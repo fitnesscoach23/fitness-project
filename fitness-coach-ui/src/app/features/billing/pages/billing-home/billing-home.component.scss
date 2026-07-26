@@ -493,6 +493,32 @@ select:focus {
   border-bottom: 1px solid #e5e7eb;
 }
 
+.sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.sort-header span {
+  min-width: 12px;
+  color: #4f46e5;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.sort-header:hover {
+  color: #111827;
+}
+
 .data-table td {
   padding: 14px;
   border-bottom: 1px solid #f1f3f7;
