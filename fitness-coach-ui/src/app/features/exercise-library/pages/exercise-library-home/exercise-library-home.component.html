@@ -118,10 +118,34 @@
     <div *ngIf="!loadingExercises && exercises.length > 0" class="library-toolbar">
       <div class="field-group search-field">
         <label for="exerciseSearch">Search Exercise</label>
-        <input
-          id="exerciseSearch"
-          [(ngModel)]="searchTerm"
-          placeholder="Search by exercise, muscle group, or muscles trained" />
+        <div class="tag-search-shell">
+          <div class="tag-search-input-wrap">
+            <span class="search-tag" *ngFor="let tag of selectedMuscleTags">
+              {{ tag }}
+              <button type="button" aria-label="Remove muscle tag" (click)="removeMuscleTag(tag)">x</button>
+            </span>
+            <input
+              id="exerciseSearch"
+              [ngModel]="searchTerm"
+              (ngModelChange)="onSearchInputChange($event)"
+              (keydown)="onSearchKeydown($event)"
+              (focus)="onSearchFocus()"
+              (blur)="onSearchBlur()"
+              placeholder="Search exercises or add muscle tags" />
+          </div>
+
+          <div
+            class="tag-suggestions"
+            *ngIf="showTagSuggestions && muscleTagSuggestions.length > 0">
+            <button
+              type="button"
+              *ngFor="let tag of muscleTagSuggestions"
+              (mousedown)="$event.preventDefault()"
+              (click)="selectMuscleTagSuggestion(tag)">
+              {{ tag }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="field-group sort-field">
@@ -132,33 +156,10 @@
         </select>
       </div>
 
-      <div class="field-group tag-filter-field" *ngIf="muscleTagOptions.length > 0">
-        <div class="tag-filter-head">
-          <label>Muscle Tags</label>
-          <button
-            *ngIf="selectedMuscleTags.length > 0"
-            type="button"
-            class="clear-tags-btn"
-            (click)="clearMuscleTags()">
-            Clear
-          </button>
-        </div>
-
-        <div class="tag-list">
-          <button
-            *ngFor="let tag of muscleTagOptions"
-            type="button"
-            class="tag-chip"
-            [class.selected]="isMuscleTagSelected(tag)"
-            (click)="toggleMuscleTag(tag)">
-            {{ tag }}
-          </button>
-        </div>
-      </div>
     </div>
 
     <div *ngIf="!loadingExercises && exercises.length > 0 && !filteredExercises.length" class="state-card">
-      No exercises match your search, muscle group, or selected tags.
+      No exercises match your search or muscle group.
     </div>
 
     <div class="table-wrap" *ngIf="!loadingExercises && filteredExercises.length > 0">

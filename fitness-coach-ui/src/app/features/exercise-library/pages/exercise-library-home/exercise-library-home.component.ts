@@ -36,8 +36,9 @@ export class ExerciseLibraryHomeComponent implements OnInit {
   exercises: any[] = [];
   loadingExercises = true;
   searchTerm = '';
-  selectedMuscleGroup = '';
   selectedMuscleTags: string[] = [];
+  showTagSuggestions = false;
+  selectedMuscleGroup = '';
 
   error: string | null = null;
   formError: string | null = null;
@@ -68,8 +69,8 @@ export class ExerciseLibraryHomeComponent implements OnInit {
 
   get filteredExercises(): any[] {
     const search = this.searchTerm.trim().toLowerCase();
-    const selectedGroup = this.selectedMuscleGroup.trim().toLowerCase();
     const selectedTags = this.selectedMuscleTags.map((tag) => this.normalizeTag(tag));
+    const selectedGroup = this.selectedMuscleGroup.trim().toLowerCase();
 
     return this.exercises.filter((exercise) => {
       const muscleGroup = String(exercise?.muscleGroup || '').toLowerCase();
@@ -113,6 +114,22 @@ export class ExerciseLibraryHomeComponent implements OnInit {
     });
 
     return Array.from(tagMap.values()).sort((a, b) => a.localeCompare(b));
+  }
+
+  get muscleTagSuggestions(): string[] {
+    const search = this.normalizeTag(this.searchTerm);
+    const selectedTagKeys = this.selectedMuscleTags.map((tag) => this.normalizeTag(tag));
+
+    if (!search) {
+      return [];
+    }
+
+    return this.muscleTagOptions
+      .filter((tag) => {
+        const normalizedTag = this.normalizeTag(tag);
+        return normalizedTag.includes(search) && !selectedTagKeys.includes(normalizedTag);
+      })
+      .slice(0, 8);
   }
 
   ngOnInit(): void {
@@ -211,24 +228,46 @@ export class ExerciseLibraryHomeComponent implements OnInit {
     this.resetForm();
   }
 
-  isMuscleTagSelected(tag: string): boolean {
-    const normalizedTag = this.normalizeTag(tag);
-    return this.selectedMuscleTags.some((selectedTag) => this.normalizeTag(selectedTag) === normalizedTag);
+  onSearchInputChange(value: string) {
+    this.searchTerm = value;
+    this.createTagsFromSearchInput();
+    this.showTagSuggestions = true;
   }
 
-  toggleMuscleTag(tag: string) {
-    if (this.isMuscleTagSelected(tag)) {
-      this.selectedMuscleTags = this.selectedMuscleTags.filter(
-        (selectedTag) => this.normalizeTag(selectedTag) !== this.normalizeTag(tag)
-      );
+  onSearchKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      if (this.searchTerm.trim() || this.muscleTagSuggestions.length) {
+        event.preventDefault();
+        this.addMuscleTag(this.muscleTagSuggestions[0] || this.searchTerm);
+      }
       return;
     }
 
-    this.selectedMuscleTags = [...this.selectedMuscleTags, tag];
+    if (event.key === 'Backspace' && !this.searchTerm && this.selectedMuscleTags.length) {
+      this.selectedMuscleTags = this.selectedMuscleTags.slice(0, -1);
+    }
   }
 
-  clearMuscleTags() {
-    this.selectedMuscleTags = [];
+  onSearchFocus() {
+    this.showTagSuggestions = true;
+  }
+
+  onSearchBlur() {
+    window.setTimeout(() => {
+      this.showTagSuggestions = false;
+    }, 120);
+  }
+
+  selectMuscleTagSuggestion(tag: string) {
+    this.addMuscleTag(tag);
+    this.showTagSuggestions = true;
+  }
+
+  removeMuscleTag(tag: string) {
+    const normalizedTag = this.normalizeTag(tag);
+    this.selectedMuscleTags = this.selectedMuscleTags.filter(
+      (selectedTag) => this.normalizeTag(selectedTag) !== normalizedTag
+    );
   }
 
   deleteExercise(exerciseId: string) {
@@ -420,6 +459,45 @@ export class ExerciseLibraryHomeComponent implements OnInit {
 
   private getExerciseTagKeys(exercise: any): string[] {
     return this.parseMuscleTags(exercise?.musclesTrained).map((tag) => this.normalizeTag(tag));
+  }
+
+  private createTagsFromSearchInput() {
+    if (!this.searchTerm.includes(';')) {
+      return;
+    }
+
+    const parts = this.searchTerm.split(';');
+    const completedTags = parts.slice(0, -1);
+    this.searchTerm = parts[parts.length - 1].trimStart();
+
+    completedTags
+      .map((tag) => tag.trim())
+      .filter((tag) => !!tag)
+      .forEach((tag) => this.addMuscleTag(tag, false));
+  }
+
+  private addMuscleTag(tag: string, clearSearch = true) {
+    const trimmedTag = tag.trim();
+    const normalizedTag = this.normalizeTag(trimmedTag);
+    if (!normalizedTag) {
+      return;
+    }
+
+    const existingOption = this.muscleTagOptions.find(
+      (option) => this.normalizeTag(option) === normalizedTag
+    );
+    const displayTag = existingOption || trimmedTag;
+    const alreadySelected = this.selectedMuscleTags.some(
+      (selectedTag) => this.normalizeTag(selectedTag) === normalizedTag
+    );
+
+    if (!alreadySelected) {
+      this.selectedMuscleTags = [...this.selectedMuscleTags, displayTag];
+    }
+
+    if (clearSearch) {
+      this.searchTerm = '';
+    }
   }
 
   private isValidOptionalVideoUrl(url: string): boolean {
