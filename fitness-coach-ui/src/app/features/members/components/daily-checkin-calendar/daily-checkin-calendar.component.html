@@ -148,20 +148,20 @@
       <div class="calendar-grid day-grid">
         <button
           type="button"
-          *ngFor="let cell of cells"
+          *ngFor="let cell of cells; trackBy: trackByCellDate"
           class="day-cell"
-          [ngClass]="getCellClass(cell)"
-          [disabled]="isCellDisabled(cell)"
+          [ngClass]="cell.className"
+          [disabled]="cell.disabled"
           (click)="selectDay(cell)">
           <span class="day-number">{{ cell.dayNumber || '' }}</span>
           <span
             class="day-state"
-            *ngFor="let marker of getEntryMarkers(cell.entry)"
+            *ngFor="let marker of cell.markers; trackBy: trackByMarkerLabel"
             [ngClass]="marker.className">
             {{ marker.label }}
           </span>
-          <span class="day-steps" *ngIf="cell.entry?.stepsCount">
-            {{ formatCellSteps(cell.entry) }} steps
+          <span class="day-steps" *ngIf="cell.stepsLabel">
+            {{ cell.stepsLabel }} steps
           </span>
         </button>
       </div>

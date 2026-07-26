@@ -15,6 +15,10 @@ interface CalendarCell {
   dayNumber: number | null;
   inMonth: boolean;
   entry: DailyCheckinDay | null;
+  className: string;
+  disabled: boolean;
+  markers: { label: string; className: string }[];
+  stepsLabel: string;
 }
 
 interface DailyCheckinEditor {
@@ -78,6 +82,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
   visibleMonth = this.getMonthKey(new Date());
   calendar: DailyCheckinCalendar | null = null;
   cells: CalendarCell[] = [];
+  summary: DailyCheckinSummary = this.emptySummary;
   selectedEntry: DailyCheckinDay | null = null;
   editor: DailyCheckinEditor | null = null;
   loading = false;
@@ -103,19 +108,6 @@ export class DailyCheckinCalendarComponent implements OnChanges {
         this.cells = this.buildCells(this.calendar.days || []);
       }
     }
-  }
-
-  get summary(): DailyCheckinSummary {
-    if (!this.cells.length) return this.emptySummary;
-
-    const trackedCells = this.cells.filter((cell) => cell.inMonth && this.isTrackableDate(cell.date));
-    return {
-      daysInMonth: trackedCells.length,
-      recordedDays: trackedCells.filter((cell) => Boolean(cell.entry)).length,
-      activeDays: trackedCells.filter((cell) => this.isEntryActive(cell.entry)).length,
-      exerciseDays: trackedCells.filter((cell) => Boolean(cell.entry?.exerciseDone)).length,
-      totalSteps: trackedCells.reduce((sum, cell) => sum + Math.max(0, Number(cell.entry?.stepsCount || 0)), 0)
-    };
   }
 
   get visibleMonthLabel(): string {
@@ -325,17 +317,6 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     });
   }
 
-  getCellClass(cell: CalendarCell): string {
-    if (!cell.inMonth) return 'empty';
-    if (!this.isTrackableDate(cell.date)) return 'not-tracked';
-    if (!cell.entry) return 'no-entry';
-    return this.isEntryActive(cell.entry) ? 'active-day' : 'no-activity';
-  }
-
-  isCellDisabled(cell: CalendarCell): boolean {
-    return !cell.inMonth || !this.isTrackableDate(cell.date);
-  }
-
   isTrackableDate(date: string): boolean {
     return !this.activeStartDate || date >= this.activeStartDate;
   }
@@ -344,7 +325,7 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     return this.activityMarkers.find((option) => option.key === marker)?.label || '';
   }
 
-  getEntryMarkers(entry: DailyCheckinDay | null): { label: string; className: string }[] {
+  private getEntryMarkers(entry: DailyCheckinDay | null): { label: string; className: string }[] {
     if (!entry) return [];
     return this.activityMarkers
       .filter((marker) => Boolean(entry[marker.key]))
@@ -402,9 +383,17 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     }
   }
 
-  formatCellSteps(entry: DailyCheckinDay | null): string {
+  private formatCellSteps(entry: DailyCheckinDay | null): string {
     if (!entry || !entry.stepsCount) return '';
     return new Intl.NumberFormat('en-IN').format(entry.stepsCount);
+  }
+
+  trackByCellDate(index: number, cell: CalendarCell): string {
+    return cell.date || `empty-${index}`;
+  }
+
+  trackByMarkerLabel(index: number, marker: { label: string; className: string }): string {
+    return `${marker.className}-${marker.label}-${index}`;
   }
 
   private loadCalendar(): void {
@@ -443,24 +432,62 @@ export class DailyCheckinCalendarComponent implements OnChanges {
     const cells: CalendarCell[] = [];
 
     for (let i = 0; i < firstDay.getDay(); i += 1) {
-      cells.push({ date: '', dayNumber: null, inMonth: false, entry: null });
+      cells.push(this.createCalendarCell('', null, false, null));
     }
 
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = `${this.visibleMonth}-${String(day).padStart(2, '0')}`;
-      cells.push({
-        date,
-        dayNumber: day,
-        inMonth: true,
-        entry: byDate.get(date) || null
-      });
+      cells.push(this.createCalendarCell(date, day, true, byDate.get(date) || null));
     }
 
     while (cells.length % 7 !== 0) {
-      cells.push({ date: '', dayNumber: null, inMonth: false, entry: null });
+      cells.push(this.createCalendarCell('', null, false, null));
     }
 
+    this.summary = this.buildSummary(cells);
     return cells;
+  }
+
+  private createCalendarCell(
+    date: string,
+    dayNumber: number | null,
+    inMonth: boolean,
+    entry: DailyCheckinDay | null
+  ): CalendarCell {
+    const disabled = !inMonth || !this.isTrackableDate(date);
+    let className = 'empty';
+
+    if (inMonth && disabled) {
+      className = 'not-tracked';
+    } else if (inMonth && !entry) {
+      className = 'no-entry';
+    } else if (inMonth) {
+      className = this.isEntryActive(entry) ? 'active-day' : 'no-activity';
+    }
+
+    return {
+      date,
+      dayNumber,
+      inMonth,
+      entry,
+      className,
+      disabled,
+      markers: this.getEntryMarkers(entry),
+      stepsLabel: this.formatCellSteps(entry)
+    };
+  }
+
+  private buildSummary(cells: CalendarCell[]): DailyCheckinSummary {
+    if (!cells.length) return this.emptySummary;
+
+    const trackedCells = cells.filter((cell) => cell.inMonth && this.isTrackableDate(cell.date));
+    return {
+      daysInMonth: trackedCells.length,
+      recordedDays: trackedCells.filter((cell) => Boolean(cell.entry)).length,
+      activeDays: trackedCells.filter((cell) => this.isEntryActive(cell.entry)).length,
+      exerciseDays: trackedCells.filter((cell) => Boolean(cell.entry?.exerciseDone)).length,
+      totalSteps: trackedCells.reduce((sum, cell) => sum + Math.max(0, Number(cell.entry?.stepsCount || 0)), 0)
+    };
   }
 
   private getMonthKey(value: Date): string {

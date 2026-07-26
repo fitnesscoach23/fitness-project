@@ -140,6 +140,10 @@ export class MemberProfileComponent implements OnInit {
   previousWeekConsistency: WeeklyConsistencyScore | null = null;
   weeklyConsistencyTrend: WeeklyConsistencyTrend = 'stable';
   weeklyScoreDifference = 0;
+  weeklyConsistencyTrendLabel = 'Stable';
+  weeklyTrendDifferenceLabel = 'Stable';
+  nextWeekFocus = 'Review consistency once this week has check-ins.';
+  coachAction = { label: 'Follow-up recommended', className: 'follow-up' };
   weeklyManualFeedback = '';
   lastActivityDate: string | null = null;
   daysSinceActivity: number | null = null;
@@ -192,6 +196,8 @@ export class MemberProfileComponent implements OnInit {
   showPhaseForm = false;
   phaseFormMode: 'create' | 'edit' = 'create';
   editingPhaseId: string | null = null;
+  phaseDurationOptions = [4, 8, 12, 16, 24];
+  phaseDurationWeeks: number | null = 8;
   phaseForm: CoachingPhasePayload = this.createEmptyPhaseForm();
   totalPaid = 0;
   totalPending = 0;
@@ -508,7 +514,7 @@ export class MemberProfileComponent implements OnInit {
       phaseName: '',
       goal: '',
       startDate: today,
-      plannedEndDate: '',
+      plannedEndDate: this.calculatePhaseEndDate(today, this.phaseDurationWeeks),
       status: 'ACTIVE',
       workoutPlanId: null,
       dietPlanId: null,
@@ -556,6 +562,8 @@ export class MemberProfileComponent implements OnInit {
     this.phaseForm.plannedWorkoutDays = this.member?.daysPerWeekTrain ?? null;
     this.phaseForm.workoutPlanId = this.activeWorkoutPlan?.id || null;
     this.phaseForm.dietPlanId = this.dietPlan?.id || null;
+    this.phaseDurationWeeks = 8;
+    this.updatePhaseReviewDateFromDuration();
     this.showPhaseForm = true;
     this.phaseActionMessage = null;
   }
@@ -563,12 +571,14 @@ export class MemberProfileComponent implements OnInit {
   startPhaseEdit(phase: any): void {
     this.phaseFormMode = 'edit';
     this.editingPhaseId = phase?.id || null;
+    const startDate = this.normalizeDateInput(phase?.startDate) || this.getTodayDateInput();
+    const plannedEndDate = this.normalizeDateInput(phase?.plannedEndDate) || '';
     this.phaseForm = {
       phaseNumber: phase?.phaseNumber ?? null,
       phaseName: phase?.phaseName || '',
       goal: phase?.goal || '',
-      startDate: this.normalizeDateInput(phase?.startDate) || this.getTodayDateInput(),
-      plannedEndDate: this.normalizeDateInput(phase?.plannedEndDate) || '',
+      startDate,
+      plannedEndDate,
       status: phase?.status || 'ACTIVE',
       workoutPlanId: phase?.workoutPlanId || null,
       dietPlanId: phase?.dietPlanId || null,
@@ -581,8 +591,21 @@ export class MemberProfileComponent implements OnInit {
       phaseNotes: phase?.phaseNotes || '',
       coachReason: phase?.coachReason || ''
     };
+    this.phaseDurationWeeks = this.inferPhaseDurationWeeks(startDate, plannedEndDate);
     this.showPhaseForm = true;
     this.phaseActionMessage = null;
+  }
+
+  onPhaseDurationChange(): void {
+    this.updatePhaseReviewDateFromDuration();
+  }
+
+  onPhaseStartDateChange(): void {
+    this.updatePhaseReviewDateFromDuration();
+  }
+
+  onPhaseReviewDateChange(): void {
+    this.phaseDurationWeeks = this.inferPhaseDurationWeeks(this.phaseForm.startDate, this.phaseForm.plannedEndDate || '');
   }
 
   savePhase(): void {
@@ -1558,11 +1581,55 @@ private loadSubscriptionOverride() {
   }
 }
 
-private normalizeDateInput(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toISOString().slice(0, 10);
-}
+  private normalizeDateInput(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  private updatePhaseReviewDateFromDuration(): void {
+    if (!this.phaseDurationWeeks) return;
+    this.phaseForm.plannedEndDate = this.calculatePhaseEndDate(this.phaseForm.startDate, this.phaseDurationWeeks);
+  }
+
+  private calculatePhaseEndDate(startDate: string, durationWeeks: number | null): string {
+    if (!startDate || !durationWeeks) return '';
+
+    const parsedStartDate = this.parseDateInputLocal(startDate);
+    if (!parsedStartDate) return '';
+
+    const endDate = this.addDays(parsedStartDate, durationWeeks * 7);
+    return this.formatDateInput(endDate);
+  }
+
+  private inferPhaseDurationWeeks(startDate: string, endDate: string): number | null {
+    const parsedStartDate = this.parseDateInputLocal(startDate);
+    const parsedEndDate = this.parseDateInputLocal(endDate);
+
+    if (!parsedStartDate || !parsedEndDate) return null;
+
+    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+    const diffDays = Math.round((parsedEndDate.getTime() - parsedStartDate.getTime()) / millisecondsPerDay);
+    const diffWeeks = diffDays / 7;
+
+    return this.phaseDurationOptions.includes(diffWeeks) ? diffWeeks : null;
+  }
+
+  private parseDateInputLocal(value: string): Date | null {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+
+    const [, year, month, day] = match;
+    const parsedDate = new Date(Number(year), Number(month) - 1, Number(day));
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }
+
+  private formatDateInput(value: Date): string {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 
 private getMemberCreatedDate(): string {
   return this.normalizeDateInput(this.member?.createdAt || this.member?.activeSince || '');
@@ -2129,6 +2196,7 @@ loadWeeklyConsistency() {
           this.currentWeekConsistency?.score,
           this.previousWeekConsistency?.score
         );
+        this.syncWeeklyConsistencyViewState();
         this.updateActivityFollowUp(days, today);
         this.syncGeneratedCoachFeedback();
         this.weeklyConsistencyLoading = false;
@@ -2138,6 +2206,7 @@ loadWeeklyConsistency() {
         this.previousWeekConsistency = null;
         this.lastActivityDate = null;
         this.daysSinceActivity = null;
+        this.syncWeeklyConsistencyViewState();
         this.weeklyConsistencyLoading = false;
         this.weeklyConsistencyError = 'Failed to load weekly consistency';
       }
@@ -2436,6 +2505,13 @@ getCoachAction(score: number | null | undefined = this.currentWeekConsistency?.s
   if (value >= 85) return { label: 'No action needed', className: 'no-action' };
   if (value >= 70) return { label: 'Send encouragement', className: 'encouragement' };
   return { label: 'Follow-up recommended', className: 'follow-up' };
+}
+
+private syncWeeklyConsistencyViewState(): void {
+  this.weeklyConsistencyTrendLabel = this.getWeeklyConsistencyTrendLabel();
+  this.weeklyTrendDifferenceLabel = this.getWeeklyTrendDifferenceLabel();
+  this.nextWeekFocus = this.generateNextWeekFocus();
+  this.coachAction = this.getCoachAction();
 }
 
 onWeeklyFeedbackChanged(): void {

@@ -1001,13 +1001,13 @@
             <span *ngIf="weeklyConsistencyTrend === 'improving'">📈</span>
             <span *ngIf="weeklyConsistencyTrend === 'declining'">📉</span>
             <span *ngIf="weeklyConsistencyTrend === 'stable'">→</span>
-            {{ getWeeklyTrendDifferenceLabel() }}
+            {{ weeklyTrendDifferenceLabel }}
           </div>
           <div
             class="coach-action-badge"
             data-html2canvas-ignore="true"
-            [ngClass]="getCoachAction().className">
-            {{ getCoachAction().label }}
+            [ngClass]="coachAction.className">
+            {{ coachAction.label }}
           </div>
           <button
             type="button"
@@ -1138,7 +1138,7 @@
           </div>
           <div>
             <label>Trend</label>
-            <span>{{ getWeeklyConsistencyTrendLabel() }} · {{ getWeeklyTrendDifferenceLabel() }}</span>
+            <span>{{ weeklyConsistencyTrendLabel }} · {{ weeklyTrendDifferenceLabel }}</span>
           </div>
         </div>
       </div>
@@ -1147,7 +1147,7 @@
         *ngIf="!weeklyConsistencyLoading && !weeklyConsistencyError"
         class="next-week-focus-panel">
         <label>Next Week Focus</label>
-        <p>{{ generateNextWeekFocus() }}</p>
+        <p>{{ nextWeekFocus }}</p>
       </div>
 
       <div
@@ -1437,11 +1437,32 @@
       </label>
       <label>
         Start Date
-        <input type="date" name="startDate" [(ngModel)]="phaseForm.startDate" required />
+        <input
+          type="date"
+          name="startDate"
+          [(ngModel)]="phaseForm.startDate"
+          (ngModelChange)="onPhaseStartDateChange()"
+          required />
+      </label>
+      <label>
+        Duration
+        <select
+          name="phaseDurationWeeks"
+          [(ngModel)]="phaseDurationWeeks"
+          (ngModelChange)="onPhaseDurationChange()">
+          <option [ngValue]="null">Custom</option>
+          <option *ngFor="let weeks of phaseDurationOptions" [ngValue]="weeks">
+            {{ weeks }}-week
+          </option>
+        </select>
       </label>
       <label>
         Review Date
-        <input type="date" name="plannedEndDate" [(ngModel)]="phaseForm.plannedEndDate" />
+        <input
+          type="date"
+          name="plannedEndDate"
+          [(ngModel)]="phaseForm.plannedEndDate"
+          (ngModelChange)="onPhaseReviewDateChange()" />
       </label>
       <label>
         Status
