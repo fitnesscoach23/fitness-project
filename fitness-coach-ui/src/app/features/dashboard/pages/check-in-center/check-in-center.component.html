@@ -33,7 +33,7 @@
             Member
             <select [(ngModel)]="checkinCadenceMemberId" (ngModelChange)="onCheckinCadenceMemberChange()">
               <option value="" disabled>Select member</option>
-              <option *ngFor="let member of checkinReminderRows" [value]="member.id">
+              <option *ngFor="let member of alphabeticalCheckinReminderRows" [value]="member.id">
                 {{ member.fullName }} ({{ member.email }})
               </option>
             </select>

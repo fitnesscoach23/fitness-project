@@ -330,6 +330,15 @@ export class DashboardComponent implements OnInit {
     ).length;
   }
 
+  get alphabeticalCheckinReminderRows(): CheckinReminderRow[] {
+    return [...this.checkinReminderRows].sort((a, b) =>
+      String(a.fullName || '').localeCompare(String(b.fullName || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
+    );
+  }
+
   get averageCheckinConsistencyScore(): number {
     if (!this.checkinReminderRows.length) return 0;
 
