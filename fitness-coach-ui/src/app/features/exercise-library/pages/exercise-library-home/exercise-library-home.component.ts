@@ -331,6 +331,44 @@ export class ExerciseLibraryHomeComponent implements OnInit {
     reader.readAsArrayBuffer(file);
   }
 
+  exportExerciseLibraryToExcel() {
+    if (typeof XLSX === 'undefined') {
+      alert('Excel exporter is not loaded. Please refresh and try again.');
+      return;
+    }
+
+    const exportRows = this.filteredExercises;
+    if (!exportRows.length) {
+      alert('No exercise rows available to export.');
+      return;
+    }
+
+    const rows: any[][] = [
+      ['Sr No', 'Muscle Group', 'Exercise Name', 'Muscles Trained'],
+      ...exportRows.map((exercise, index) => [
+        exercise?.srNo ?? index + 1,
+        exercise?.muscleGroup || '',
+        exercise?.exerciseName || '',
+        exercise?.musclesTrained || ''
+      ])
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 10 },
+      { wch: 24 },
+      { wch: 42 },
+      { wch: 54 }
+    ];
+    ws['!autofilter'] = { ref: `A1:D${rows.length}` };
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Exercise Library');
+
+    const dateLabel = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Exercise-Library-${dateLabel}.xlsx`);
+  }
+
   private importRows(rows: ImportRow[], done: () => void) {
     this.importing = true;
     const startingSrNo = this.getNextSrNo();

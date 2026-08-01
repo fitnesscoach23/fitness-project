@@ -15,6 +15,14 @@
         [disabled]="importing" />
 
       <span class="import-message" *ngIf="importMessage">{{ importMessage }}</span>
+
+      <button
+        type="button"
+        class="btn btn-secondary export-btn"
+        (click)="exportExerciseLibraryToExcel()"
+        [disabled]="loadingExercises || !filteredExercises.length">
+        Export To Excel
+      </button>
     </div>
   </section>
 
