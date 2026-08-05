@@ -81,6 +81,10 @@ export class BillingHomeComponent implements OnInit {
   totalPaid = 0;
   totalPending = 0;
   pendingAmountSource = 'No amount found';
+  pendingAmountDraft: number | null = null;
+  pendingAmountEditing = false;
+  pendingAmountMessage: string | null = null;
+  pendingAmountError: string | null = null;
 
   overrideActiveSince = '';
   overrideRenewalDate = '';
@@ -165,6 +169,7 @@ export class BillingHomeComponent implements OnInit {
     }
 
     this.selectedMember = this.members.find((m) => m.id === this.selectedMemberId) || null;
+    this.cancelPendingAmountEdit();
     this.loadSubscriptionOverride();
     this.syncManualPaymentDateWithRenewalDate();
     this.loadSelectedMemberBilling();
@@ -528,6 +533,75 @@ export class BillingHomeComponent implements OnInit {
     );
     this.totalPending = pendingSummary.amount;
     this.pendingAmountSource = pendingSummary.source;
+    if (!this.pendingAmountEditing) {
+      this.pendingAmountDraft = this.totalPending;
+    }
+  }
+
+  beginPendingAmountEdit(): void {
+    if (!this.selectedMemberId) return;
+
+    this.pendingAmountDraft = this.totalPending;
+    this.pendingAmountEditing = true;
+    this.pendingAmountMessage = null;
+    this.pendingAmountError = null;
+  }
+
+  cancelPendingAmountEdit(): void {
+    this.pendingAmountDraft = this.totalPending;
+    this.pendingAmountEditing = false;
+    this.pendingAmountError = null;
+  }
+
+  savePendingAmountOverride(): void {
+    this.pendingAmountMessage = null;
+    this.pendingAmountError = null;
+
+    if (!this.selectedMemberId) {
+      this.pendingAmountError = 'Select a member first';
+      return;
+    }
+
+    const amount = Number(this.pendingAmountDraft);
+    if (!Number.isFinite(amount) || amount < 0) {
+      this.pendingAmountError = 'Enter a valid pending amount';
+      return;
+    }
+
+    const existingOverride = this.getDashboardBillingSnapshotOverride(this.selectedMemberId) || {};
+    const payload = {
+      ...existingOverride,
+      pendingAmount: Math.round(amount)
+    };
+
+    localStorage.setItem(this.getDashboardBillingSnapshotOverrideKey(this.selectedMemberId), JSON.stringify(payload));
+    this.pendingAmountEditing = false;
+    this.pendingAmountMessage = 'Pending amount updated';
+    this.calculatePaymentSummary();
+    this.loadAllMemberBilling();
+  }
+
+  clearPendingAmountOverride(): void {
+    if (!this.selectedMemberId) return;
+
+    const existingOverride = this.getDashboardBillingSnapshotOverride(this.selectedMemberId);
+    if (!existingOverride || existingOverride.pendingAmount == null) {
+      this.pendingAmountEditing = false;
+      return;
+    }
+
+    delete existingOverride.pendingAmount;
+
+    if (Object.keys(existingOverride).length) {
+      localStorage.setItem(this.getDashboardBillingSnapshotOverrideKey(this.selectedMemberId), JSON.stringify(existingOverride));
+    } else {
+      localStorage.removeItem(this.getDashboardBillingSnapshotOverrideKey(this.selectedMemberId));
+    }
+
+    this.pendingAmountEditing = false;
+    this.pendingAmountMessage = 'Pending amount override cleared';
+    this.calculatePaymentSummary();
+    this.loadAllMemberBilling();
   }
 
   openMemberProfile(memberId: string): void {
@@ -922,7 +996,7 @@ export class BillingHomeComponent implements OnInit {
   }
 
   private getDashboardBillingSnapshotOverride(memberId: string): any | null {
-    const raw = localStorage.getItem(`dashboard_billing_snapshot_override_${memberId}`);
+    const raw = localStorage.getItem(this.getDashboardBillingSnapshotOverrideKey(memberId));
     if (!raw) return null;
 
     try {
@@ -930,6 +1004,10 @@ export class BillingHomeComponent implements OnInit {
     } catch {
       return null;
     }
+  }
+
+  private getDashboardBillingSnapshotOverrideKey(memberId: string): string {
+    return `dashboard_billing_snapshot_override_${memberId}`;
   }
 
   private getSuccessfulPayments(payments: any[]): any[] {
@@ -1101,7 +1179,7 @@ export class BillingHomeComponent implements OnInit {
   private clearDashboardBillingSnapshotForSelectedMember(): void {
     if (!this.selectedMemberId) return;
 
-    localStorage.removeItem(`dashboard_billing_snapshot_override_${this.selectedMemberId}`);
+    localStorage.removeItem(this.getDashboardBillingSnapshotOverrideKey(this.selectedMemberId));
   }
 
   private clearStoredSubscriptionOverrideForSelectedMember(): void {

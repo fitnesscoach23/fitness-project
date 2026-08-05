@@ -129,9 +129,46 @@
           <strong>{{ getDaysRemainingLabel(displayedRenewalDate) }}</strong>
         </div>
         <div class="stat-box">
-          <span class="stat-label">Pending</span>
-          <small>{{ pendingAmountSource }}</small>
-          <strong>₹ {{ totalPending }}</strong>
+          <div class="stat-box-head">
+            <span class="stat-label">Pending</span>
+            <button
+              *ngIf="!pendingAmountEditing"
+              type="button"
+              class="text-btn"
+              [disabled]="!selectedMemberId"
+              (click)="beginPendingAmountEdit()">
+              Edit
+            </button>
+          </div>
+
+          <ng-container *ngIf="!pendingAmountEditing; else pendingAmountEditor">
+            <small>{{ pendingAmountSource }}</small>
+            <strong>₹ {{ totalPending }}</strong>
+          </ng-container>
+
+          <ng-template #pendingAmountEditor>
+            <div class="pending-edit-form">
+              <input
+                type="number"
+                min="0"
+                placeholder="Pending amount"
+                [(ngModel)]="pendingAmountDraft" />
+              <div class="pending-edit-actions">
+                <button type="button" class="primary-btn mini-btn" (click)="savePendingAmountOverride()">
+                  Save
+                </button>
+                <button type="button" class="secondary-btn mini-btn" (click)="cancelPendingAmountEdit()">
+                  Cancel
+                </button>
+                <button type="button" class="secondary-btn mini-btn" (click)="clearPendingAmountOverride()">
+                  Clear
+                </button>
+              </div>
+            </div>
+          </ng-template>
+
+          <div *ngIf="pendingAmountMessage" class="info-text compact-message">{{ pendingAmountMessage }}</div>
+          <div *ngIf="pendingAmountError" class="error compact-message">{{ pendingAmountError }}</div>
         </div>
         <div class="stat-box">
           <span class="stat-label">Member Status</span>

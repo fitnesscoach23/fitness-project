@@ -266,6 +266,58 @@ select:focus {
   background: #f9fafb;
 }
 
+.stat-box-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stat-box-head .stat-label {
+  margin-bottom: 6px;
+}
+
+.text-btn {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.text-btn:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.pending-edit-form {
+  display: grid;
+  gap: 10px;
+}
+
+.pending-edit-form input {
+  height: 40px;
+  border-radius: 10px;
+}
+
+.pending-edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pending-edit-actions .mini-btn {
+  margin-right: 0;
+}
+
+.compact-message {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
 .stat-box.soon {
   border-color: #f59e0b;
   background: #fffbeb;
