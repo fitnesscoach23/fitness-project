@@ -164,34 +164,36 @@ save() {
       const rows: DietRow[] = [];
       for (const item of meal.items || []) {
         const parsedFood = this.parseStoredFoodName(item.foodName);
-        rows.push({
+        const savedQuantity = this.toNumberOrNull(item.quantity);
+        const savedCalories = item.calories ?? this.calculateCalories({
           mealType: meal.mealName,
-          foodName: parsedFood.primaryFoodName,
-          dietLibraryFoodId: null,
-          libraryCategory: null,
-          libraryBaseQuantity: null,
-          libraryBaseUnit: null,
-          libraryBaseCalories: null,
-          libraryBaseCarbs: null,
-          libraryBaseProtein: null,
-          libraryBaseFat: null,
-          optionalAlternatives: parsedFood.optionalAlternatives,
-          optionalAlternativesText: parsedFood.optionalAlternatives.join(', '),
+          foodName: item.foodName,
           quantity: item.quantity,
           unit: item.unit,
           protein: item.protein,
           carbs: item.carbs,
           fat: item.fat,
-          calories: item.calories ?? this.calculateCalories({
-            mealType: meal.mealName,
-            foodName: item.foodName,
-            quantity: item.quantity,
-            unit: item.unit,
-            protein: item.protein,
-            carbs: item.carbs,
-            fat: item.fat,
-            calories: null
-          })
+          calories: null
+        });
+        rows.push({
+          mealType: meal.mealName,
+          foodName: parsedFood.primaryFoodName,
+          dietLibraryFoodId: null,
+          libraryCategory: null,
+          libraryBaseQuantity: savedQuantity,
+          libraryBaseUnit: item.unit || null,
+          libraryBaseCalories: this.toNumberOrNull(savedCalories),
+          libraryBaseCarbs: this.toNumberOrNull(item.carbs),
+          libraryBaseProtein: this.toNumberOrNull(item.protein),
+          libraryBaseFat: this.toNumberOrNull(item.fat),
+          optionalAlternatives: parsedFood.optionalAlternatives,
+          optionalAlternativesText: parsedFood.optionalAlternatives.join(', '),
+          quantity: savedQuantity,
+          unit: item.unit,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+          calories: savedCalories
         });
       }
       meals.push({
@@ -352,32 +354,49 @@ onFoodNameInput(row: DietRow) {
 
 onQuantityChanged(row: DietRow) {
   if (!this.hasLibraryMacroBase(row)) {
-    this.applyLibraryFoodByName(row);
-    return;
+    if (!this.applyLibraryFoodByName(row)) {
+      return;
+    }
   }
 
   this.applyScaledMacros(row);
 }
 
-applyLibraryFoodByName(row: DietRow) {
-  const typed = row.foodName?.trim().toLowerCase();
-  if (!typed) return;
+applyLibraryFoodByName(row: DietRow): boolean {
+  const typed = row.foodName?.trim();
+  if (!typed) return false;
 
-  const match = this.dietLibraryFoods.find(
-    (f: any) => String(f?.foodItem || '').trim().toLowerCase() === typed
-  );
+  const match = this.findLibraryFoodByName(typed);
 
-  if (!match) return;
+  if (!match) return false;
   row.dietLibraryFoodId = match.id || null;
   this.applyLibraryFoodToRow(row, match);
+  return true;
 }
 
 private hydrateRowsFromDietLibrary() {
   for (const row of this.allDietRows) {
-    if (!this.hasLibraryMacroBase(row)) {
-      this.applyLibraryFoodByName(row);
-    }
+    this.applyLibraryFoodByName(row);
   }
+}
+
+private findLibraryFoodByName(foodName: string | null | undefined): any | null {
+  const normalizedFoodName = this.normalizeFoodLookupName(foodName);
+  if (!normalizedFoodName) return null;
+
+  return this.dietLibraryFoods.find(
+    (food: any) => this.normalizeFoodLookupName(food?.foodItem) === normalizedFoodName
+  ) || null;
+}
+
+private normalizeFoodLookupName(value: any): string {
+  return String(value || '')
+    .replace(/\[\[OPT:.*?\]\]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*\(\s*/g, '(')
+    .replace(/\s*\)\s*/g, ')')
+    .trim()
+    .toLowerCase();
 }
 
 private applyLibraryFoodToRow(row: DietRow, selected: any) {
