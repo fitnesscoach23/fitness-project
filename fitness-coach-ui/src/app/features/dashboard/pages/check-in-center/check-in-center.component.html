@@ -15,7 +15,10 @@
         </div>
 
         <div class="check-in-center-actions">
-          <a class="center-form-link" routerLink="/checkins/create">
+          <a
+            class="center-form-link"
+            routerLink="/checkins/create"
+            [queryParams]="selectedCheckinMember ? { memberId: selectedCheckinMember.id } : null">
             Open Check-In Form
           </a>
           <div class="center-count-pill">
@@ -157,6 +160,12 @@
                   <span>Next Due</span>
                   <strong>{{ formatDate(selectedCheckinMember.nextCheckinDate) }}</strong>
                 </div>
+                <a
+                  class="center-form-link"
+                  routerLink="/checkins/create"
+                  [queryParams]="{ memberId: selectedCheckinMember.id }">
+                  Create Check-In
+                </a>
               </div>
             </div>
 

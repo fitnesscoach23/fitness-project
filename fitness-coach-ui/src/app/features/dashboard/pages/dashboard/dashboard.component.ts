@@ -294,6 +294,10 @@ export class DashboardComponent implements OnInit {
 
   onCheckinCadenceMemberChange(): void {
     this.checkinCadenceDays = this.getStoredCheckinCadenceDays(this.checkinCadenceMemberId) || 7;
+    const member = this.checkinReminderRows.find((item) => item.id === this.checkinCadenceMemberId);
+    if (member) {
+      this.selectCheckinMember(member);
+    }
   }
 
   saveCheckinCadence(): void {
@@ -944,7 +948,6 @@ export class DashboardComponent implements OnInit {
         this.checkinReminderRows = rows
           .map((row) => row.checkinReminder)
           .filter((row): row is CheckinReminderRow => !!row)
-          .filter((row) => row.lastTwoWeekDailyConsistencyScore > 50)
           .sort((a, b) => {
             if (a.cadenceConfigured !== b.cadenceConfigured) {
               return a.cadenceConfigured ? -1 : 1;

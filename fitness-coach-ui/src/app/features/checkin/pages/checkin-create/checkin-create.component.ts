@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { ProgressCheckinApiService } from '../../../../core/services/progress-checkin-api.service';
@@ -70,16 +71,28 @@ export class CheckinCreateComponent implements OnInit {
   constructor(
     private api: ProgressCheckinApiService,
     private memberApi: MemberApiService,
-    private photoApi: ProgressCheckinPhotoApiService
+    private photoApi: ProgressCheckinPhotoApiService,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit() {
     this.memberApi.getMembers().subscribe({
-      next: res => this.members = res,
+      next: res => {
+        this.members = res;
+        this.selectMemberFromRoute();
+      },
       error: () => {
         this.error = 'Failed to load members';
       }
     });
+  }
+
+  private selectMemberFromRoute(): void {
+    const routeMemberId = this.route.snapshot.queryParamMap.get('memberId');
+    if (!routeMemberId || !this.members.some(member => member.id === routeMemberId)) return;
+
+    this.memberId = routeMemberId;
+    this.onMemberChange();
   }
 
   onMemberChange() {
