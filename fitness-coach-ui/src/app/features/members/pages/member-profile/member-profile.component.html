@@ -566,7 +566,7 @@
         class="secondary-btn"
         (click)="openProgressComparison()"
         [disabled]="!canCompareProgress">
-        Compare Latest 2 Check-ins
+        Compare Check-ins
       </button>
     </div>
 
@@ -699,6 +699,16 @@
             {{ member?.fullName }} · {{ formatProgressCheckinDate(currentCheckin?.submittedAt) }}
             vs {{ formatProgressCheckinDate(previousCheckin?.submittedAt) }}
           </p>
+          <label class="comparison-checkin-selector" data-html2canvas-ignore="true">
+            <span>Compare latest with</span>
+            <select
+              [ngModel]="selectedComparisonCheckinId"
+              (ngModelChange)="onComparisonCheckinChange($event)">
+              <option *ngFor="let checkin of comparisonCheckinOptions" [ngValue]="checkin.id">
+                {{ formatProgressCheckinDate(checkin.submittedAt) }}
+              </option>
+            </select>
+          </label>
         </div>
         <div class="comparison-modal-actions">
           <div class="comparison-zoom-controls">
@@ -767,19 +777,19 @@
               <div class="comparison-label">Current Weight</div>
               <div class="comparison-value">{{ getComparisonValue(currentCheckin, 'weight') }}</div>
 
-              <div class="comparison-label">Previous Weight</div>
+              <div class="comparison-label">Selected Check-in Weight</div>
               <div class="comparison-value">{{ getComparisonValue(previousCheckin, 'weight') }}</div>
 
               <div class="comparison-label">Current Steps</div>
               <div class="comparison-value">{{ getComparisonValue(currentCheckin, 'stepsAvg') }}</div>
 
-              <div class="comparison-label">Previous Steps</div>
+              <div class="comparison-label">Selected Check-in Steps</div>
               <div class="comparison-value">{{ getComparisonValue(previousCheckin, 'stepsAvg') }}</div>
 
               <div class="comparison-label">Current Diet Rating</div>
               <div class="comparison-value">{{ getComparisonValue(currentCheckin, 'dietAdherence') }}/10</div>
 
-              <div class="comparison-label">Previous Diet Rating</div>
+              <div class="comparison-label">Selected Check-in Diet Rating</div>
               <div class="comparison-value">{{ getComparisonValue(previousCheckin, 'dietAdherence') }}/10</div>
 
               <div class="comparison-label accent">Current Diet Plan</div>
@@ -794,14 +804,14 @@
               <div class="comparison-value wide">
                 Current {{ getComparisonValue(currentCheckin, 'exerciseRating') }}/10
                 <br />
-                Previous {{ getComparisonValue(previousCheckin, 'exerciseRating') }}/10
+                Selected {{ getComparisonValue(previousCheckin, 'exerciseRating') }}/10
               </div>
 
               <div class="comparison-label accent">Coach Notes</div>
               <div class="comparison-value wide comparison-notes-value">
                 <strong>Most Recent:</strong> {{ getComparisonNotes(currentCheckin) }}
                 <br />
-                <strong>Previous:</strong> {{ getComparisonNotes(previousCheckin) }}
+                <strong>Selected Check-in:</strong> {{ getComparisonNotes(previousCheckin) }}
               </div>
             </div>
           </div>
@@ -831,7 +841,7 @@
               <ng-template #noPreviousFront>
                 <div class="comparison-photo-empty">No previous front photo</div>
               </ng-template>
-              <div class="comparison-photo-caption">Previous</div>
+              <div class="comparison-photo-caption">Selected Check-in</div>
             </div>
           </div>
 
@@ -860,7 +870,7 @@
               <ng-template #noPreviousSide>
                 <div class="comparison-photo-empty">No previous side photo</div>
               </ng-template>
-              <div class="comparison-photo-caption">Previous</div>
+              <div class="comparison-photo-caption">Selected Check-in</div>
             </div>
           </div>
 
@@ -889,7 +899,7 @@
               <ng-template #noPreviousBack>
                 <div class="comparison-photo-empty">No previous back photo</div>
               </ng-template>
-              <div class="comparison-photo-caption">Previous</div>
+              <div class="comparison-photo-caption">Selected Check-in</div>
             </div>
           </div>
         </div>

@@ -170,6 +170,7 @@ export class MemberProfileComponent implements OnInit {
   draggedPhoto: { checkinId: string; index: number } | null = null;
   currentCheckin: any | null = null;
   previousCheckin: any | null = null;
+  selectedComparisonCheckinId: string | null = null;
   showProgressComparisonModal = false;
   isProgressComparisonMaximized = false;
   comparisonZoomLevel = 1;
@@ -3241,7 +3242,12 @@ getPhotoUrl(fileName: string) {
 }
 
   prepareComparison() {
-    if (!this.progressCheckins || this.progressCheckins.length === 0) return;
+    if (!this.progressCheckins || this.progressCheckins.length === 0) {
+      this.currentCheckin = null;
+      this.previousCheckin = null;
+      this.selectedComparisonCheckinId = null;
+      return;
+    }
 
   const sorted = [...this.progressCheckins].sort(
     (a, b) =>
@@ -3249,9 +3255,24 @@ getPhotoUrl(fileName: string) {
       this.getCheckinDateValue(a.submittedAt)
   );
 
-  this.currentCheckin = sorted[0] || null;
-  this.previousCheckin = sorted[1] || null;
-}
+    this.currentCheckin = sorted[0] || null;
+    const selectedCheckin = sorted.find(
+      checkin => checkin.id === this.selectedComparisonCheckinId && checkin.id !== this.currentCheckin?.id
+    );
+    this.previousCheckin = selectedCheckin || sorted[1] || null;
+    this.selectedComparisonCheckinId = this.previousCheckin?.id || null;
+  }
+
+  get comparisonCheckinOptions(): any[] {
+    return this.progressCheckins.filter(checkin => checkin.id !== this.currentCheckin?.id);
+  }
+
+  onComparisonCheckinChange(checkinId: string | null): void {
+    this.selectedComparisonCheckinId = checkinId;
+    this.previousCheckin = this.comparisonCheckinOptions.find(
+      checkin => checkin.id === checkinId
+    ) || null;
+  }
 
   getDelta(current?: number, previous?: number): string {
     if (current == null || previous == null) return '-';
