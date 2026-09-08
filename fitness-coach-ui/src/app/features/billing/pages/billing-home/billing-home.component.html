@@ -18,7 +18,7 @@
           <label>Member</label>
           <select [(ngModel)]="selectedMemberId" (ngModelChange)="onMemberChange()">
             <option value="" disabled>Select member</option>
-            <option *ngFor="let m of members" [value]="m.id">
+            <option *ngFor="let m of activeMembers" [value]="m.id">
               {{ m.fullName }} ({{ m.email }})
             </option>
           </select>

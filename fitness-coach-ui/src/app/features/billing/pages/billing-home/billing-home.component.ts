@@ -50,6 +50,7 @@ export class BillingHomeComponent implements OnInit {
 
   private readonly expirySoonDays = 7;
   members: any[] = [];
+  activeMembers: any[] = [];
   membersLoading = true;
   membersError: string | null = null;
 
@@ -140,10 +141,11 @@ export class BillingHomeComponent implements OnInit {
     this.memberApi.getMembers().subscribe({
       next: (res: any[]) => {
         this.members = res || [];
+        this.activeMembers = this.members.filter((member) => member?.status !== 'INACTIVE');
         this.membersLoading = false;
 
-        if (this.members.length > 0) {
-          this.selectedMemberId = this.members[0].id;
+        if (this.activeMembers.length > 0) {
+          this.selectedMemberId = this.activeMembers[0].id;
           this.onMemberChange();
         } else {
           this.billingRows = [];

@@ -20,6 +20,12 @@ export class MemberApiService {
     );
   }
 
+  getActiveMembers() {
+    return this.getMembers().pipe(
+      map((members) => members.filter((member) => member?.status !== 'INACTIVE'))
+    );
+  }
+
   private sortMembersByName(members: any[]): any[] {
     return [...members].sort((a, b) => {
       const aName = this.getMemberSortText(a?.fullName);

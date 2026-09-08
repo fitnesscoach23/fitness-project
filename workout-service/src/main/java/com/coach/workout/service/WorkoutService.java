@@ -23,6 +23,7 @@ public class WorkoutService {
     private final WorkoutDayRepository dayRepo;
     private final ExerciseRepository exerciseRepo;
     private final ExerciseSetRepository setRepo;
+    private final ExerciseLibraryRepository libraryRepo;
 
     public UUID createPlan(String coachEmail, CreateWorkoutPlanRequest req) {
         WorkoutPlan plan = WorkoutPlan.builder()
@@ -65,6 +66,7 @@ public class WorkoutService {
                 .build();
 
         exerciseRepo.save(ex);
+        updateMatchingLibraryExerciseVideo(coachEmail, ex.getName(), ex.getVideoUrl());
         return ex.getId();
     }
 
@@ -201,6 +203,7 @@ public class WorkoutService {
         ex.setMusclesTrained(req.musclesTrained());
         ex.setVideoUrl(req.videoUrl());
         exerciseRepo.save(ex);
+        updateMatchingLibraryExerciseVideo(coachEmail, ex.getName(), ex.getVideoUrl());
 
         List<ExerciseSet> existingSets = setRepo.findByExerciseId(exerciseId);
 
@@ -314,5 +317,22 @@ public class WorkoutService {
         planRepo.delete(plan);
     }
 
+    private void updateMatchingLibraryExerciseVideo(String coachEmail, String exerciseName, String videoUrl) {
+        if (exerciseName == null || exerciseName.isBlank()) {
+            return;
+        }
+
+        List<ExerciseLibraryItem> matchingExercises =
+                libraryRepo.findByCoachEmailAndExerciseNameIgnoringCaseAndWhitespace(coachEmail, exerciseName);
+
+        matchingExercises.forEach(item -> {
+            item.setVideoUrl(videoUrl);
+            item.setUpdatedAt(Instant.now());
+        });
+
+        if (!matchingExercises.isEmpty()) {
+            libraryRepo.saveAll(matchingExercises);
+        }
+    }
 
 }

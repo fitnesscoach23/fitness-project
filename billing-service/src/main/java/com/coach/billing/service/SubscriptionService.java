@@ -34,7 +34,10 @@ public class SubscriptionService {
     }
 
     public List<SubscriptionResponse> list(String coachEmail, UUID memberId) {
-        return repo.findByMemberIdAndCoachEmailOrderByEndDateDesc(memberId, coachEmail)
+        List<Subscription> subscriptions = repo.findByMemberIdAndCoachEmailOrderByEndDateDesc(memberId, coachEmail);
+        expireOverdueSubscriptions(subscriptions);
+
+        return subscriptions
                 .stream()
                 .map(s -> new SubscriptionResponse(
                         s.getId(),
@@ -43,6 +46,17 @@ public class SubscriptionService {
                         s.getEndDate(),
                         s.getStatus().name()
                 )).toList();
+    }
+
+    private void expireOverdueSubscriptions(List<Subscription> subscriptions) {
+        LocalDate today = LocalDate.now();
+        subscriptions.stream()
+                .filter(subscription -> subscription.getStatus() == SubscriptionStatus.ACTIVE)
+                .filter(subscription -> subscription.getEndDate().isBefore(today))
+                .forEach(subscription -> {
+                    subscription.setStatus(SubscriptionStatus.EXPIRED);
+                    repo.save(subscription);
+                });
     }
 
     /**

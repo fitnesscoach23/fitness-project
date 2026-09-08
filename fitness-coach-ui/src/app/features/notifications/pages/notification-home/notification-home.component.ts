@@ -117,7 +117,7 @@ export class NotificationHomeComponent implements OnInit {
 
   loadMembers() {
     this.membersLoading = true;
-    this.memberApi.getMembers().subscribe({
+    this.memberApi.getActiveMembers().subscribe({
       next: (res: any[]) => {
         this.members = res || [];
         this.membersLoading = false;

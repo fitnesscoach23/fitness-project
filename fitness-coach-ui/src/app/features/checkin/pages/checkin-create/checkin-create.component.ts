@@ -76,7 +76,7 @@ export class CheckinCreateComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.memberApi.getMembers().subscribe({
+    this.memberApi.getActiveMembers().subscribe({
       next: res => {
         this.members = res;
         this.selectMemberFromRoute();

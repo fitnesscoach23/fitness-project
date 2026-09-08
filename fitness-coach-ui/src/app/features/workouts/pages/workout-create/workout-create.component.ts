@@ -137,7 +137,7 @@ emptyRow(dayName = ''): WorkoutGridRow {
   loadMembers() {
     this.loadingMembers = true;
 
-    this.memberApi.getMembers().subscribe({
+    this.memberApi.getActiveMembers().subscribe({
       next: (res: any[]) => {
         this.members = res || [];
         this.loadingMembers = false;

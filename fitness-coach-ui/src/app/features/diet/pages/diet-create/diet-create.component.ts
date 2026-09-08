@@ -88,7 +88,7 @@ export class DietCreateComponent implements OnInit {
 ngOnInit() {
   this.loadDietLibraryFoods();
 
-  this.memberApi.getMembers().subscribe({
+  this.memberApi.getActiveMembers().subscribe({
     next: (res) => this.members = res,
     error: () => {
       this.error = 'Failed to load members';

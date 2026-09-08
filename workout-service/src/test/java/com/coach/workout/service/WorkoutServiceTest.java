@@ -1,7 +1,11 @@
 package com.coach.workout.service;
 
+import com.coach.workout.dto.AddExerciseRequest;
+import com.coach.workout.entity.ExerciseLibraryItem;
+import com.coach.workout.entity.WorkoutDay;
 import com.coach.workout.dto.UpdateWorkoutPlanRequest;
 import com.coach.workout.entity.WorkoutPlan;
+import com.coach.workout.repository.ExerciseLibraryRepository;
 import com.coach.workout.repository.ExerciseRepository;
 import com.coach.workout.repository.ExerciseSetRepository;
 import com.coach.workout.repository.WorkoutDayRepository;
@@ -15,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,6 +43,9 @@ class WorkoutServiceTest {
 
     @Mock
     private ExerciseSetRepository setRepo;
+
+    @Mock
+    private ExerciseLibraryRepository libraryRepo;
 
     @InjectMocks
     private WorkoutService service;
@@ -123,5 +131,32 @@ class WorkoutServiceTest {
 
         verify(exerciseRepo, never()).findByDayId(dayId);
         verify(dayRepo, never()).delete(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void addExerciseUpdatesVideoForMatchingLibraryExercise() {
+        UUID planId = UUID.randomUUID();
+        UUID dayId = UUID.randomUUID();
+        WorkoutPlan plan = WorkoutPlan.builder()
+                .id(planId)
+                .coachEmail("coach@example.com")
+                .build();
+        WorkoutDay day = WorkoutDay.builder().id(dayId).planId(planId).build();
+        ExerciseLibraryItem libraryExercise = ExerciseLibraryItem.builder()
+                .exerciseName("  Bench Press  ")
+                .videoUrl("https://old.example/video")
+                .build();
+
+        when(dayRepo.findById(dayId)).thenReturn(Optional.of(day));
+        when(planRepo.findById(planId)).thenReturn(Optional.of(plan));
+        when(libraryRepo.findByCoachEmailAndExerciseNameIgnoringCaseAndWhitespace(
+                "coach@example.com", "bench press"))
+                .thenReturn(List.of(libraryExercise));
+
+        service.addExercise("coach@example.com", dayId, new AddExerciseRequest(
+                "bench press", null, null, null, "https://new.example/video"));
+
+        assertEquals("https://new.example/video", libraryExercise.getVideoUrl());
+        verify(libraryRepo).saveAll(List.of(libraryExercise));
     }
 }
