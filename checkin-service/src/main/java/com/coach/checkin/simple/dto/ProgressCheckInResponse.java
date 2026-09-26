@@ -10,7 +10,7 @@ public record ProgressCheckInResponse(
     BigDecimal weight,
     Integer dietAdherence,
     Integer energy,
-    Integer exerciseRating,
+    BigDecimal exerciseRating,
     Integer stepsAvg,
     String notes,
     Instant submittedAt

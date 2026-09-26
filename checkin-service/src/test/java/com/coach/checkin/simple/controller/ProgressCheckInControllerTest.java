@@ -92,7 +92,7 @@ class ProgressCheckInControllerTest {
                                   "memberId": "%s",
                                   "weight": 60,
                                   "dietAdherence": 8,
-                                  "exerciseRating": 7,
+                                  "exerciseRating": 7.5,
                                   "stepsAvg": 12000,
                                   "notes": "Updated notes",
                                   "submittedAt": "2026-03-20T10:00:00Z"
@@ -145,6 +145,21 @@ class ProgressCheckInControllerTest {
     }
 
     @Test
+    void updateShouldReturnBadRequestWhenExerciseRatingHasMoreThanOneDecimalPlace() throws Exception {
+        UUID checkInId = UUID.randomUUID();
+
+        mockMvc.perform(put("/progress/checkins/{checkInId}", checkInId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "memberId": "%s",
+                                  "exerciseRating": 7.55
+                                }
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void listShouldIncludeExerciseRating() throws Exception {
         UUID memberId = UUID.randomUUID();
         when(currentUserUtil.coachEmail()).thenReturn("coach@test.com");
@@ -155,7 +170,7 @@ class ProgressCheckInControllerTest {
                         new BigDecimal("82.50"),
                         8,
                         7,
-                        9,
+                        new BigDecimal("9.5"),
                         9000,
                         "Strong week",
                         Instant.parse("2026-03-22T10:15:30Z")
@@ -164,6 +179,6 @@ class ProgressCheckInControllerTest {
 
         mockMvc.perform(get("/progress/checkins/member/{memberId}", memberId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].exerciseRating").value(9));
+                .andExpect(jsonPath("$[0].exerciseRating").value(9.5));
     }
 }

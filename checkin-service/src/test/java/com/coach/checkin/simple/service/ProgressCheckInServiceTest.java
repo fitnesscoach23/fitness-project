@@ -51,7 +51,7 @@ class ProgressCheckInServiceTest {
                 new BigDecimal("81.20"),
                 8,
                 7,
-                9,
+                new BigDecimal("9.5"),
                 8500,
                 "Good training block",
                 submittedAt
@@ -61,7 +61,7 @@ class ProgressCheckInServiceTest {
         verify(repo).save(captor.capture());
 
         ProgressCheckIn saved = captor.getValue();
-        assertEquals(9, saved.getExerciseRating());
+        assertEquals(new BigDecimal("9.5"), saved.getExerciseRating());
         assertEquals(submittedAt, saved.getSubmittedAt());
     }
 
@@ -99,7 +99,7 @@ class ProgressCheckInServiceTest {
                 .weight(new BigDecimal("80.00"))
                 .dietAdherence(6)
                 .energy(5)
-                .exerciseRating(4)
+                .exerciseRating(new BigDecimal("4.0"))
                 .stepsAvg(6000)
                 .notes("Old notes")
                 .submittedAt(Instant.parse("2026-03-18T10:00:00Z"))
@@ -112,7 +112,7 @@ class ProgressCheckInServiceTest {
                 new BigDecimal("60.00"),
                 8,
                 7,
-                9,
+                new BigDecimal("9.5"),
                 12000,
                 "Updated notes",
                 updatedSubmittedAt
@@ -127,7 +127,7 @@ class ProgressCheckInServiceTest {
         assertEquals(new BigDecimal("60.00"), saved.getWeight());
         assertEquals(8, saved.getDietAdherence());
         assertEquals(7, saved.getEnergy());
-        assertEquals(9, saved.getExerciseRating());
+        assertEquals(new BigDecimal("9.5"), saved.getExerciseRating());
         assertEquals(12000, saved.getStepsAvg());
         assertEquals("Updated notes", saved.getNotes());
         assertEquals(updatedSubmittedAt, saved.getSubmittedAt());
@@ -144,7 +144,7 @@ class ProgressCheckInServiceTest {
                         new BigDecimal("60.00"),
                         8,
                         7,
-                        9,
+                        new BigDecimal("9.5"),
                         12000,
                         "Updated notes",
                         Instant.parse("2026-03-20T10:00:00Z")

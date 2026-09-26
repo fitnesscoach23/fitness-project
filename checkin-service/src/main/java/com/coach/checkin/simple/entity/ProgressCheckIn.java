@@ -38,7 +38,8 @@ public class ProgressCheckIn {
     private BigDecimal weight;
     private Integer dietAdherence;
     private Integer energy;
-    private Integer exerciseRating;
+    @Column(precision = 3, scale = 1)
+    private BigDecimal exerciseRating;
     private Integer stepsAvg;
 
     @Column(columnDefinition = "TEXT")
